@@ -1,0 +1,714 @@
+/* ================================
+   PocketMusica - Style v2
+   Chiptune Sequencer for Mobile
+   ================================ */
+
+:root {
+    /* Colors */
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #12121a;
+    --bg-tertiary: #1a1a25;
+
+    --accent-cyan: #00f0ff;
+    --accent-magenta: #ff00aa;
+    --accent-yellow: #ffee00;
+    --accent-green: #00ff88;
+    --accent-red: #ff4444;
+    --accent-orange: #ff8800;
+
+    --text-primary: #ffffff;
+    --text-secondary: #8888aa;
+    --text-muted: #555566;
+
+    --border-color: #2a2a3a;
+    --border-glow: rgba(0, 240, 255, 0.3);
+
+    /* Track Colors */
+    --track1-color: #00f0ff;
+    --track2-color: #ff00aa;
+    --track3-color: #00ff88;
+    --track4-color: #ffee00;
+
+    /* Fonts */
+    --font-display: 'Orbitron', monospace;
+    --font-mono: 'Share Tech Mono', monospace;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+html,
+body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: var(--font-mono);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    touch-action: manipulation;
+}
+
+/* ================================
+   App Container
+   ================================ */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 6px;
+    gap: 6px;
+}
+
+/* ================================
+   Header
+   ================================ */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.app-title {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.tempo-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tempo-btn {
+    width: 28px;
+    height: 28px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    color: var(--accent-cyan);
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+
+.tempo-btn:active {
+    background: var(--accent-cyan);
+    color: var(--bg-primary);
+    transform: scale(0.95);
+}
+
+.tempo-display {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    color: var(--accent-yellow);
+    min-width: 40px;
+    text-align: center;
+}
+
+/* ================================
+   Track Tabs
+   ================================ */
+.track-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.track-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 4px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.track-tab:nth-child(1) {
+    --tab-color: var(--track1-color);
+}
+
+.track-tab:nth-child(2) {
+    --tab-color: var(--track2-color);
+}
+
+.track-tab:nth-child(3) {
+    --tab-color: var(--track3-color);
+}
+
+.track-tab:nth-child(4) {
+    --tab-color: var(--track4-color);
+}
+
+.track-tab.active {
+    background: var(--bg-tertiary);
+    border-color: var(--tab-color);
+    color: var(--tab-color);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.track-num {
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.track-type {
+    font-size: 0.6rem;
+    opacity: 0.8;
+}
+
+/* Sound Selector Popup */
+.sound-selector {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-secondary);
+    border: 2px solid var(--accent-cyan);
+    border-radius: 10px;
+    padding: 12px;
+    gap: 8px;
+    flex-direction: column;
+    z-index: 100;
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.4);
+}
+
+.sound-selector.visible {
+    display: flex;
+}
+
+.sound-option {
+    padding: 12px 24px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.sound-option:active {
+    background: var(--accent-cyan);
+    color: var(--bg-primary);
+}
+
+/* ================================
+   Grid Section
+   ================================ */
+.grid-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    padding: 6px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.grid-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+
+.length-buttons,
+.division-buttons {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.length-label,
+.division-label {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    margin-right: 2px;
+}
+
+.len-btn,
+.div-btn {
+    padding: 3px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.len-btn.active {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+}
+
+.div-btn.active {
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+}
+
+/* Step Grid - 32 steps fixed, 8 columns */
+.step-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 3px;
+    min-height: 0;
+}
+
+.step {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.1s;
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.step-number {
+    position: absolute;
+    top: 1px;
+    left: 2px;
+    font-size: 0.45rem;
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.step-note {
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    color: var(--text-primary);
+}
+
+.step.has-note {
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.15) 0%, rgba(255, 0, 170, 0.15) 100%);
+    border-color: var(--accent-cyan);
+}
+
+.step.has-note .step-note {
+    color: var(--accent-cyan);
+}
+
+.step.rest {
+    background: rgba(255, 238, 0, 0.1);
+    border-color: var(--accent-yellow);
+}
+
+.step.rest .step-note {
+    color: var(--accent-yellow);
+}
+
+.step.tie {
+    background: rgba(0, 255, 136, 0.1);
+    border-color: var(--accent-green);
+}
+
+.step.tie .step-note {
+    color: var(--accent-green);
+}
+
+.step.out-of-range {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.step.current {
+    box-shadow: 0 0 0 2px var(--accent-magenta), 0 0 10px rgba(255, 0, 170, 0.5);
+}
+
+.step.selected {
+    box-shadow: 0 0 0 2px var(--accent-yellow);
+}
+
+.step:active {
+    transform: scale(0.95);
+}
+
+/* ================================
+   Sequencer Controls
+   ================================ */
+.seq-controls {
+    display: flex;
+    gap: 6px;
+}
+
+.seq-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 8px 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.seq-btn:active {
+    background: var(--bg-tertiary);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+}
+
+.seq-icon {
+    font-size: 1rem;
+}
+
+.seq-label {
+    font-size: 0.6rem;
+    font-family: var(--font-display);
+}
+
+.rec-btn.active {
+    background: rgba(255, 68, 68, 0.2);
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+    animation: rec-pulse 1s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+}
+
+/* ================================
+   Keyboard Section
+   ================================ */
+.keyboard-section {
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    padding: 6px;
+}
+
+.octave-control {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.octave-btn {
+    width: 24px;
+    height: 24px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--accent-magenta);
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.octave-btn:active {
+    background: var(--accent-magenta);
+    color: var(--bg-primary);
+}
+
+.octave-display {
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+#octave-value {
+    color: var(--accent-magenta);
+}
+
+.keyboard {
+    display: flex;
+    position: relative;
+    height: 70px;
+    gap: 2px;
+}
+
+.key {
+    flex: 1;
+    background: linear-gradient(180deg, #ffffff 0%, #d0d0d0 100%);
+    border: none;
+    border-radius: 0 0 4px 4px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: bold;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.05s;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 3px;
+    position: relative;
+    z-index: 1;
+}
+
+.key.black {
+    position: absolute;
+    width: 10%;
+    height: 55%;
+    background: linear-gradient(180deg, #333 0%, #111 100%);
+    color: #888;
+    font-size: 0.5rem;
+    z-index: 2;
+    border-radius: 0 0 3px 3px;
+}
+
+.key:active,
+.key.active {
+    transform: scaleY(0.96);
+}
+
+.key:not(.black):active,
+.key:not(.black).active {
+    background: linear-gradient(180deg, var(--accent-cyan) 0%, #00c0cc 100%);
+    color: var(--bg-primary);
+}
+
+.key.black:active,
+.key.black.active {
+    background: linear-gradient(180deg, var(--accent-magenta) 0%, #cc0088 100%);
+    color: white;
+}
+
+/* Black key positions */
+.key.black[data-note="C#"] {
+    left: 6%;
+}
+
+.key.black[data-note="D#"] {
+    left: 17%;
+}
+
+.key.black[data-note="F#"] {
+    left: 40%;
+}
+
+.key.black[data-note="G#"] {
+    left: 51%;
+}
+
+.key.black[data-note="A#"] {
+    left: 62%;
+}
+
+/* ================================
+   Player Section
+   ================================ */
+.player-section {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.play-stop-btn {
+    width: 60px;
+    height: 50px;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #00cc66 100%);
+    border: none;
+    border-radius: 8px;
+    color: var(--bg-primary);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.play-stop-btn:active {
+    transform: scale(0.95);
+    filter: brightness(1.2);
+}
+
+.play-stop-btn.playing {
+    background: linear-gradient(135deg, var(--accent-red) 0%, #cc0000 100%);
+}
+
+.play-icon {
+    font-size: 1.5rem;
+}
+
+/* Mixer */
+.mixer {
+    flex: 1;
+    display: flex;
+    gap: 6px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    padding: 6px;
+}
+
+.track-mixer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    position: relative;
+}
+
+.track-mixer:nth-child(1) {
+    --mixer-color: var(--track1-color);
+}
+
+.track-mixer:nth-child(2) {
+    --mixer-color: var(--track2-color);
+}
+
+.track-mixer:nth-child(3) {
+    --mixer-color: var(--track3-color);
+}
+
+.track-mixer:nth-child(4) {
+    --mixer-color: var(--track4-color);
+}
+
+.volume-bar {
+    flex: 1;
+    width: 100%;
+    min-height: 20px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+}
+
+.volume-bar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--volume, 100%);
+    background: linear-gradient(180deg, var(--mixer-color) 0%, rgba(0, 0, 0, 0.3) 100%);
+    transition: height 0.1s;
+}
+
+.track-mixer.muted .volume-bar::after {
+    opacity: 0.2;
+}
+
+.track-label {
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+.track-mixer.muted .track-label {
+    text-decoration: line-through;
+    opacity: 0.5;
+}
+
+/* ================================
+   Footer
+   ================================ */
+.footer {
+    display: flex;
+    gap: 6px;
+}
+
+.footer-btn {
+    flex: 1;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.footer-btn:active {
+    background: var(--bg-tertiary);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+}
+
+/* ================================
+   Responsive
+   ================================ */
+@media (max-height: 700px) {
+    .keyboard {
+        height: 55px;
+    }
+
+    .step-note {
+        font-size: 0.55rem;
+    }
+
+    .app-title {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-height: 600px) {
+    .keyboard {
+        height: 45px;
+    }
+
+    .seq-btn {
+        padding: 6px 4px;
+    }
+
+    .player-section {
+        gap: 4px;
+    }
+
+    .play-stop-btn {
+        width: 50px;
+        height: 40px;
+    }
+}
