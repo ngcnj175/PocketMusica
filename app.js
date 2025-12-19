@@ -1,5 +1,5 @@
 /**
- * Pocket Musica - Main Application v3
+ * Pocket Musica - Main Application v4
  * Multi-track chiptune sequencer
  */
 
@@ -7,8 +7,6 @@ class PocketMusica {
     constructor() {
         // State
         this.bpm = 120;
-        this.patternLength = 16;
-        this.division = 16;
         this.currentStep = 0;
         this.selectedStep = 0;
         this.isPlaying = false;
@@ -16,12 +14,12 @@ class PocketMusica {
         this.playInterval = null;
         this.currentTrack = 0;
 
-        // Track data
+        // Track data - each track has its own DIV, LEN, LOOP settings
         this.tracks = [
-            { pattern: this.createEmptyPattern(), soundType: 'pulse1', volume: 100, muted: false },
-            { pattern: this.createEmptyPattern(), soundType: 'pulse2', volume: 100, muted: false },
-            { pattern: this.createEmptyPattern(), soundType: 'triangle', volume: 100, muted: false },
-            { pattern: this.createEmptyPattern(), soundType: 'noise', volume: 100, muted: false }
+            { pattern: this.createEmptyPattern(), soundType: 'pulse1', volume: 100, muted: false, division: 16, length: 16, loop: true },
+            { pattern: this.createEmptyPattern(), soundType: 'pulse2', volume: 100, muted: false, division: 16, length: 16, loop: true },
+            { pattern: this.createEmptyPattern(), soundType: 'triangle', volume: 100, muted: false, division: 16, length: 16, loop: true },
+            { pattern: this.createEmptyPattern(), soundType: 'noise', volume: 100, muted: false, division: 16, length: 16, loop: true }
         ];
 
         // Sound type labels
@@ -46,9 +44,12 @@ class PocketMusica {
         this.lastTapTime = 0;
         this.lastTapStep = -1;
 
-        // Mixer swipe handling
+        // Mixer handling
         this.mixerTouchStart = {};
         this.mixerDoubleTapTime = {};
+
+        // Track positions for non-looping tracks
+        this.trackPositions = [0, 0, 0, 0];
 
         this.init();
     }
@@ -61,7 +62,18 @@ class PocketMusica {
         this.loadFromStorage();
         this.updateDisplay();
 
-        console.log('🎹 Pocket Musica v3 initialized');
+        // Prevent text selection on buttons
+        this.preventTextSelection();
+
+        console.log('🎹 Pocket Musica v4 initialized');
+    }
+
+    preventTextSelection() {
+        // Prevent default on all buttons
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('selectstart', (e) => e.preventDefault());
+            btn.addEventListener('contextmenu', (e) => e.preventDefault());
+        });
     }
 
     cacheElements() {
@@ -89,9 +101,11 @@ class PocketMusica {
         this.recBtn = document.getElementById('btn-rec');
 
         // Grid
+        this.stepGridWrapper = document.getElementById('step-grid-wrapper');
         this.stepGrid = document.getElementById('step-grid');
         this.lenButtons = document.querySelectorAll('.len-btn');
         this.divButtons = document.querySelectorAll('.div-btn');
+        this.loopBtn = document.getElementById('btn-loop');
 
         // Player
         this.playStopBtn = document.getElementById('btn-play-stop');
@@ -140,7 +154,7 @@ class PocketMusica {
         // DEL - short press: delete previous, long press: clear track
         this.delBtn.addEventListener('click', () => this.deletePrevious());
         this.delBtn.addEventListener('mousedown', () => this.startDelLongPress());
-        this.delBtn.addEventListener('touchstart', () => this.startDelLongPress());
+        this.delBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.startDelLongPress(); });
         this.delBtn.addEventListener('mouseup', () => this.cancelDelLongPress());
         this.delBtn.addEventListener('touchend', () => this.cancelDelLongPress());
         this.delBtn.addEventListener('mouseleave', () => this.cancelDelLongPress());
@@ -156,16 +170,17 @@ class PocketMusica {
             btn.addEventListener('click', () => this.changeDivision(parseInt(btn.dataset.division)));
         });
 
+        // Loop button
+        this.loopBtn.addEventListener('click', () => this.toggleLoop());
+
         // Play/Stop
         this.playStopBtn.addEventListener('click', () => this.togglePlay());
 
-        // Mixer - swipe for volume, double tap for mute
+        // Mixer
         this.trackMixers.forEach((mixer, index) => {
             mixer.addEventListener('touchstart', (e) => this.onMixerTouchStart(index, e));
             mixer.addEventListener('touchmove', (e) => this.onMixerTouchMove(index, e));
             mixer.addEventListener('touchend', (e) => this.onMixerTouchEnd(index, e));
-
-            // Mouse support
             mixer.addEventListener('mousedown', (e) => this.onMixerMouseDown(index, e));
         });
 
@@ -179,7 +194,7 @@ class PocketMusica {
     }
 
     createEmptyPattern() {
-        return Array(32).fill(null).map(() => ({
+        return Array(64).fill(null).map(() => ({
             note: null,
             type: 'empty'
         }));
@@ -190,17 +205,16 @@ class PocketMusica {
     clearAll() {
         if (confirm('全てのデータを初期化しますか？')) {
             this.tracks = [
-                { pattern: this.createEmptyPattern(), soundType: 'pulse1', volume: 100, muted: false },
-                { pattern: this.createEmptyPattern(), soundType: 'pulse2', volume: 100, muted: false },
-                { pattern: this.createEmptyPattern(), soundType: 'triangle', volume: 100, muted: false },
-                { pattern: this.createEmptyPattern(), soundType: 'noise', volume: 100, muted: false }
+                { pattern: this.createEmptyPattern(), soundType: 'pulse1', volume: 100, muted: false, division: 16, length: 16, loop: true },
+                { pattern: this.createEmptyPattern(), soundType: 'pulse2', volume: 100, muted: false, division: 16, length: 16, loop: true },
+                { pattern: this.createEmptyPattern(), soundType: 'triangle', volume: 100, muted: false, division: 16, length: 16, loop: true },
+                { pattern: this.createEmptyPattern(), soundType: 'noise', volume: 100, muted: false, division: 16, length: 16, loop: true }
             ];
             this.bpm = 120;
-            this.patternLength = 16;
-            this.division = 16;
             this.currentStep = 0;
             this.selectedStep = 0;
             this.currentTrack = 0;
+            this.trackPositions = [0, 0, 0, 0];
 
             this.updateDisplay();
             this.renderGrid();
@@ -214,10 +228,8 @@ class PocketMusica {
 
         if (fileName) {
             const data = {
-                version: 3,
+                version: 4,
                 bpm: this.bpm,
-                patternLength: this.patternLength,
-                division: this.division,
                 tracks: this.tracks,
                 savedAt: new Date().toISOString()
             };
@@ -244,11 +256,10 @@ class PocketMusica {
                 const data = JSON.parse(e.target.result);
 
                 this.bpm = data.bpm || 120;
-                this.patternLength = data.patternLength || 16;
-                this.division = data.division || 16;
                 this.tracks = data.tracks || this.tracks;
                 this.currentStep = 0;
                 this.selectedStep = 0;
+                this.trackPositions = [0, 0, 0, 0];
 
                 this.updateDisplay();
                 this.renderGrid();
@@ -258,8 +269,6 @@ class PocketMusica {
             }
         };
         reader.readAsText(file);
-
-        // Reset input
         event.target.value = '';
     }
 
@@ -309,6 +318,7 @@ class PocketMusica {
         this.currentTrack = index;
         this.selectedStep = 0;
         this.updateTrackTabs();
+        this.updateControlButtons();
         this.renderGrid();
     }
 
@@ -317,6 +327,23 @@ class PocketMusica {
             tab.classList.toggle('active', index === this.currentTrack);
             tab.querySelector('.track-type').textContent = this.soundLabels[this.tracks[index].soundType];
         });
+    }
+
+    updateControlButtons() {
+        const track = this.tracks[this.currentTrack];
+
+        // Update LEN buttons
+        this.lenButtons.forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.length) === track.length);
+        });
+
+        // Update DIV buttons
+        this.divButtons.forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.division) === track.division);
+        });
+
+        // Update LOOP button
+        this.loopBtn.classList.toggle('active', track.loop);
     }
 
     // ==================== Keyboard ====================
@@ -342,11 +369,10 @@ class PocketMusica {
             });
         }
 
-        // Black keys - positioned absolutely
-        let whiteKeyIndex = 0;
+        // Black keys
         for (let oct = this.keyboardStartOctave; oct < this.keyboardStartOctave + this.keyboardOctaves; oct++) {
             const octaveIndex = oct - this.keyboardStartOctave;
-            const blackKeyOffsets = [0.7, 1.7, 3.7, 4.7, 5.7]; // Positions relative to white keys
+            const blackKeyOffsets = [0.7, 1.7, 3.7, 4.7, 5.7];
             const blackNotes = ['C#', 'D#', 'F#', 'G#', 'A#'];
 
             blackNotes.forEach((note, i) => {
@@ -357,8 +383,7 @@ class PocketMusica {
                 key.dataset.octave = oct;
                 key.dataset.fullNote = `${note}${oct}`;
 
-                // Position based on white key width (36px + 2px gap = 38px)
-                const baseOffset = octaveIndex * 7 * 38; // 7 white keys per octave
+                const baseOffset = octaveIndex * 7 * 38;
                 const keyOffset = blackKeyOffsets[i] * 38;
                 key.style.left = `${baseOffset + keyOffset}px`;
 
@@ -367,15 +392,18 @@ class PocketMusica {
             });
         }
 
-        // Scroll to middle (octave 4)
+        // Scroll to middle
         setTimeout(() => {
-            const scrollTo = 2 * 7 * 38; // Scroll to octave 4 (index 2)
+            const scrollTo = 2 * 7 * 38;
             this.keyboardWrapper.scrollLeft = scrollTo;
         }, 100);
     }
 
     addKeyEvents(key) {
-        const startNote = () => {
+        const startNote = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
             audioEngine.resume();
             const fullNote = key.dataset.fullNote;
             const soundType = this.tracks[this.currentTrack].soundType;
@@ -387,14 +415,15 @@ class PocketMusica {
             }
         };
 
-        const stopNote = () => {
+        const stopNote = (e) => {
+            e.preventDefault();
             const fullNote = key.dataset.fullNote;
             audioEngine.stopNote(fullNote, this.currentTrack);
             key.classList.remove('active');
         };
 
         key.addEventListener('mousedown', startNote);
-        key.addEventListener('touchstart', (e) => { e.preventDefault(); startNote(); });
+        key.addEventListener('touchstart', startNote);
         key.addEventListener('mouseup', stopNote);
         key.addEventListener('touchend', stopNote);
         key.addEventListener('mouseleave', stopNote);
@@ -404,39 +433,39 @@ class PocketMusica {
     // ==================== Pattern Input ====================
 
     insertNote(note) {
-        const pattern = this.tracks[this.currentTrack].pattern;
-        pattern[this.selectedStep] = { note, type: 'note' };
+        const track = this.tracks[this.currentTrack];
+        track.pattern[this.selectedStep] = { note, type: 'note' };
         this.advanceStep();
         this.renderGrid();
         this.autoSave();
     }
 
     insertRest() {
-        const pattern = this.tracks[this.currentTrack].pattern;
-        pattern[this.selectedStep] = { note: null, type: 'rest' };
+        const track = this.tracks[this.currentTrack];
+        track.pattern[this.selectedStep] = { note: null, type: 'rest' };
         this.advanceStep();
         this.renderGrid();
         this.autoSave();
     }
 
     insertTie() {
-        const pattern = this.tracks[this.currentTrack].pattern;
-        pattern[this.selectedStep] = { note: null, type: 'tie' };
+        const track = this.tracks[this.currentTrack];
+        track.pattern[this.selectedStep] = { note: null, type: 'tie' };
         this.advanceStep();
         this.renderGrid();
         this.autoSave();
     }
 
     deletePrevious() {
-        const pattern = this.tracks[this.currentTrack].pattern;
+        const track = this.tracks[this.currentTrack];
 
         if (this.selectedStep > 0) {
             this.selectedStep--;
         } else {
-            this.selectedStep = this.patternLength - 1;
+            this.selectedStep = track.length - 1;
         }
 
-        pattern[this.selectedStep] = { note: null, type: 'empty' };
+        track.pattern[this.selectedStep] = { note: null, type: 'empty' };
         this.renderGrid();
         this.autoSave();
     }
@@ -463,7 +492,8 @@ class PocketMusica {
     }
 
     advanceStep() {
-        this.selectedStep = (this.selectedStep + 1) % this.patternLength;
+        const track = this.tracks[this.currentTrack];
+        this.selectedStep = (this.selectedStep + 1) % track.length;
     }
 
     toggleRecording() {
@@ -475,9 +505,11 @@ class PocketMusica {
 
     renderGrid() {
         this.stepGrid.innerHTML = '';
-        const pattern = this.tracks[this.currentTrack].pattern;
+        const track = this.tracks[this.currentTrack];
+        const pattern = track.pattern;
 
-        for (let i = 0; i < 32; i++) {
+        // Always show 64 steps (8 rows)
+        for (let i = 0; i < 64; i++) {
             const step = pattern[i];
             const stepEl = document.createElement('div');
             stepEl.className = 'step';
@@ -485,8 +517,8 @@ class PocketMusica {
             if (step.type === 'note') stepEl.classList.add('has-note');
             if (step.type === 'rest') stepEl.classList.add('rest');
             if (step.type === 'tie') stepEl.classList.add('tie');
-            if (i >= this.patternLength) stepEl.classList.add('out-of-range');
-            if (i === this.currentStep && this.isPlaying) stepEl.classList.add('current');
+            if (i >= track.length) stepEl.classList.add('out-of-range');
+            if (i === this.trackPositions[this.currentTrack] && this.isPlaying) stepEl.classList.add('current');
             if (i === this.selectedStep) stepEl.classList.add('selected');
 
             const numEl = document.createElement('span');
@@ -512,21 +544,21 @@ class PocketMusica {
     }
 
     onStepClick(index) {
-        if (index >= this.patternLength) return;
+        const track = this.tracks[this.currentTrack];
+        if (index >= track.length) return;
 
         const now = Date.now();
 
         if (this.lastTapStep === index && now - this.lastTapTime < 300) {
-            const pattern = this.tracks[this.currentTrack].pattern;
-            pattern[index] = { note: null, type: 'empty' };
+            track.pattern[index] = { note: null, type: 'empty' };
             this.lastTapStep = -1;
         } else {
             this.selectedStep = index;
 
-            const step = this.tracks[this.currentTrack].pattern[index];
+            const step = track.pattern[index];
             if (step.type === 'note' && step.note) {
                 audioEngine.resume();
-                audioEngine.playNote(step.note, this.tracks[this.currentTrack].soundType, 0.2, this.currentTrack);
+                audioEngine.playNote(step.note, track.soundType, 0.2, this.currentTrack);
             }
         }
 
@@ -554,34 +586,51 @@ class PocketMusica {
         this.playStopBtn.classList.add('playing');
         this.playStopBtn.querySelector('.play-icon').textContent = '■';
 
-        const stepDuration = 60 / this.bpm / (this.division / 4);
+        // Reset track positions
+        this.trackPositions = [0, 0, 0, 0];
+
+        // Use smallest division for timing
+        const minDivision = Math.max(...this.tracks.map(t => t.division));
+        const stepDuration = 60 / this.bpm / (minDivision / 4);
 
         this.playInterval = setInterval(() => {
+            // Play all tracks
             for (let t = 0; t < 4; t++) {
                 const track = this.tracks[t];
-                const step = track.pattern[this.currentStep];
+                const pos = this.trackPositions[t];
 
-                let noteDuration = stepDuration;
-                if (step.type === 'note') {
-                    let tieCount = 0;
-                    for (let i = this.currentStep + 1; i < this.patternLength; i++) {
-                        if (track.pattern[i].type === 'tie') {
-                            tieCount++;
-                        } else {
-                            break;
+                if (pos < track.length || track.loop) {
+                    const actualPos = pos % track.length;
+                    const step = track.pattern[actualPos];
+
+                    // Calculate note duration based on TIEs
+                    let noteDuration = stepDuration * (minDivision / track.division);
+                    if (step.type === 'note') {
+                        let tieCount = 0;
+                        for (let i = actualPos + 1; i < track.length; i++) {
+                            if (track.pattern[i].type === 'tie') {
+                                tieCount++;
+                            } else {
+                                break;
+                            }
                         }
+                        noteDuration *= (1 + tieCount);
                     }
-                    noteDuration = stepDuration * (1 + tieCount);
-                }
 
-                if (step.type !== 'tie') {
-                    audioEngine.playStep(step, track.soundType, noteDuration, t);
+                    if (step.type !== 'tie') {
+                        audioEngine.playStep(step, track.soundType, noteDuration, t);
+                    }
+
+                    // Advance position
+                    if (track.loop) {
+                        this.trackPositions[t] = (pos + 1) % track.length;
+                    } else {
+                        this.trackPositions[t] = pos + 1;
+                    }
                 }
             }
 
             this.renderGrid();
-
-            this.currentStep = (this.currentStep + 1) % this.patternLength;
         }, stepDuration * 1000);
     }
 
@@ -589,7 +638,7 @@ class PocketMusica {
         this.isPlaying = false;
         this.playStopBtn.classList.remove('playing');
         this.playStopBtn.querySelector('.play-icon').textContent = '▶';
-        this.currentStep = 0;
+        this.trackPositions = [0, 0, 0, 0];
 
         if (this.playInterval) {
             clearInterval(this.playInterval);
@@ -614,20 +663,23 @@ class PocketMusica {
     }
 
     changeLength(newLength) {
-        this.patternLength = newLength;
+        const track = this.tracks[this.currentTrack];
+        track.length = newLength;
+
         this.lenButtons.forEach(btn => {
             btn.classList.toggle('active', parseInt(btn.dataset.length) === newLength);
         });
 
         if (this.selectedStep >= newLength) this.selectedStep = 0;
-        if (this.currentStep >= newLength) this.currentStep = 0;
 
         this.renderGrid();
         this.autoSave();
     }
 
     changeDivision(newDivision) {
-        this.division = newDivision;
+        const track = this.tracks[this.currentTrack];
+        track.division = newDivision;
+
         this.divButtons.forEach(btn => {
             btn.classList.toggle('active', parseInt(btn.dataset.division) === newDivision);
         });
@@ -636,6 +688,13 @@ class PocketMusica {
             this.stop();
             this.play();
         }
+        this.autoSave();
+    }
+
+    toggleLoop() {
+        const track = this.tracks[this.currentTrack];
+        track.loop = !track.loop;
+        this.loopBtn.classList.toggle('active', track.loop);
         this.autoSave();
     }
 
@@ -656,9 +715,10 @@ class PocketMusica {
 
         const touch = e.touches[0];
         const deltaY = this.mixerTouchStart[index].y - touch.clientY;
-        const deltaVolume = Math.round(deltaY / 2); // 2px = 1 volume
+        const deltaVolume = Math.round(deltaY / 1.5); // Sensitivity
 
-        const newVolume = Math.max(0, Math.min(100, this.mixerTouchStart[index].volume + deltaVolume));
+        // Volume range: 1-127
+        const newVolume = Math.max(1, Math.min(127, this.mixerTouchStart[index].volume + deltaVolume));
         this.setTrackVolume(index, newVolume);
     }
 
@@ -669,9 +729,8 @@ class PocketMusica {
         const duration = now - this.mixerTouchStart[index].time;
 
         // Double tap detection
-        if (duration < 200) { // Quick tap
+        if (duration < 200) {
             if (this.mixerDoubleTapTime[index] && now - this.mixerDoubleTapTime[index] < 300) {
-                // Double tap - toggle mute
                 this.toggleMute(index);
                 this.mixerDoubleTapTime[index] = null;
             } else {
@@ -684,14 +743,13 @@ class PocketMusica {
     }
 
     onMixerMouseDown(index, e) {
-        // For desktop: use scroll wheel or click-drag
         const startY = e.clientY;
         const startVolume = this.tracks[index].volume;
 
         const onMouseMove = (moveE) => {
             const deltaY = startY - moveE.clientY;
-            const deltaVolume = Math.round(deltaY / 2);
-            const newVolume = Math.max(0, Math.min(100, startVolume + deltaVolume));
+            const deltaVolume = Math.round(deltaY / 1.5);
+            const newVolume = Math.max(1, Math.min(127, startVolume + deltaVolume));
             this.setTrackVolume(index, newVolume);
         };
 
@@ -707,7 +765,7 @@ class PocketMusica {
 
     setTrackVolume(trackIndex, volume) {
         this.tracks[trackIndex].volume = volume;
-        audioEngine.setTrackVolume(trackIndex, volume / 100);
+        audioEngine.setTrackVolume(trackIndex, volume / 127);
         this.updateMixerDisplay();
     }
 
@@ -728,13 +786,8 @@ class PocketMusica {
 
     updateDisplay() {
         this.bpmDisplay.textContent = this.bpm;
-        this.lenButtons.forEach(btn => {
-            btn.classList.toggle('active', parseInt(btn.dataset.length) === this.patternLength);
-        });
-        this.divButtons.forEach(btn => {
-            btn.classList.toggle('active', parseInt(btn.dataset.division) === this.division);
-        });
         this.updateTrackTabs();
+        this.updateControlButtons();
         this.updateMixerDisplay();
     }
 
@@ -742,10 +795,8 @@ class PocketMusica {
 
     autoSave() {
         const data = {
-            version: 3,
+            version: 4,
             bpm: this.bpm,
-            patternLength: this.patternLength,
-            division: this.division,
             tracks: this.tracks,
             savedAt: new Date().toISOString()
         };
@@ -765,11 +816,18 @@ class PocketMusica {
             const data = JSON.parse(saved);
 
             this.bpm = data.bpm || 120;
-            this.patternLength = data.patternLength || 16;
-            this.division = data.division || 16;
 
             if (data.tracks) {
-                this.tracks = data.tracks;
+                // Migrate old format if needed
+                this.tracks = data.tracks.map((t, i) => ({
+                    pattern: t.pattern || this.createEmptyPattern(),
+                    soundType: t.soundType || 'pulse1',
+                    volume: t.volume || 100,
+                    muted: t.muted || false,
+                    division: t.division || 16,
+                    length: t.length || 16,
+                    loop: t.loop !== undefined ? t.loop : true
+                }));
             }
 
             console.log('📂 Loaded saved song');

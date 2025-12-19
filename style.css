@@ -1,5 +1,5 @@
 /* ================================
-   Pocket Musica - Style v3
+   Pocket Musica - Style v4
    Chiptune Sequencer for Mobile
    ================================ */
 
@@ -39,6 +39,10 @@
     padding: 0;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     user-select: none;
 }
 
@@ -46,13 +50,13 @@ html,
 body {
     height: 100%;
     overflow: hidden;
+    touch-action: manipulation;
 }
 
 body {
     font-family: var(--font-mono);
     background: var(--bg-primary);
     color: var(--text-primary);
-    touch-action: manipulation;
 }
 
 /* ================================
@@ -267,32 +271,31 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 6px;
-    gap: 8px;
+    gap: 6px;
 }
 
 .length-buttons,
 .division-buttons {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
 }
 
-.length-label,
-.division-label {
-    font-size: 0.6rem;
+.control-label {
+    font-size: 0.55rem;
     color: var(--text-muted);
     margin-right: 2px;
 }
 
 .len-btn,
 .div-btn {
-    padding: 3px 8px;
+    padding: 3px 6px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     color: var(--text-muted);
     font-family: var(--font-mono);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     cursor: pointer;
     transition: all 0.15s;
 }
@@ -307,17 +310,62 @@ body {
     color: var(--accent-orange);
 }
 
-/* Step Grid - 32 steps fixed, 8 columns */
-.step-grid {
+/* Loop Button */
+.loop-button {
+    display: flex;
+    align-items: center;
+}
+
+.loop-btn {
+    padding: 3px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-family: var(--font-display);
+    font-size: 0.55rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.loop-btn.active {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    background: rgba(0, 240, 255, 0.1);
+}
+
+/* Step Grid Wrapper - for scrolling on 64 steps */
+.step-grid-wrapper {
     flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) var(--bg-tertiary);
+}
+
+.step-grid-wrapper::-webkit-scrollbar {
+    width: 4px;
+}
+
+.step-grid-wrapper::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+}
+
+.step-grid-wrapper::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 2px;
+}
+
+/* Step Grid - 8 columns */
+.step-grid {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    grid-template-rows: repeat(4, 1fr);
     gap: 3px;
-    min-height: 0;
 }
 
 .step {
+    aspect-ratio: 1;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -328,7 +376,6 @@ body {
     cursor: pointer;
     transition: all 0.1s;
     position: relative;
-    min-height: 0;
     overflow: hidden;
 }
 
@@ -336,14 +383,14 @@ body {
     position: absolute;
     top: 1px;
     left: 2px;
-    font-size: 0.45rem;
+    font-size: 0.4rem;
     color: var(--text-muted);
     opacity: 0.6;
 }
 
 .step-note {
     font-family: var(--font-display);
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     color: var(--text-primary);
 }
 
@@ -461,10 +508,11 @@ body {
 }
 
 .keyboard-wrapper {
-    overflow-x: auto;
+    overflow-x: scroll;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    touch-action: pan-x;
 }
 
 .keyboard-wrapper::-webkit-scrollbar {
@@ -497,6 +545,7 @@ body {
     padding-bottom: 3px;
     position: relative;
     z-index: 1;
+    touch-action: manipulation;
 }
 
 .key.black {
@@ -515,16 +564,11 @@ body {
     transform: scaleY(0.96);
 }
 
-.key:not(.black):active,
-.key:not(.black).active {
+/* Both white and black keys use cyan when pressed */
+.key:active,
+.key.active {
     background: linear-gradient(180deg, var(--accent-cyan) 0%, #00c0cc 100%);
     color: var(--bg-primary);
-}
-
-.key.black:active,
-.key.black.active {
-    background: linear-gradient(180deg, var(--accent-magenta) 0%, #cc0088 100%);
-    color: white;
 }
 
 /* ================================
@@ -635,7 +679,7 @@ body {
     }
 
     .step-note {
-        font-size: 0.55rem;
+        font-size: 0.5rem;
     }
 
     .app-title {
