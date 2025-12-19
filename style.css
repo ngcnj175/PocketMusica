@@ -1,5 +1,5 @@
 /* ================================
-   PocketMusica - Style v2
+   Pocket Musica - Style v3
    Chiptune Sequencer for Mobile
    ================================ */
 
@@ -79,32 +79,60 @@ body {
     background: var(--bg-secondary);
     border-radius: 6px;
     border: 1px solid var(--border-color);
+    gap: 8px;
 }
 
 .app-title {
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-weight: 700;
     background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    white-space: nowrap;
 }
 
-.tempo-control {
+.header-controls {
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
-.tempo-btn {
+.header-btn {
     width: 28px;
     height: 28px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.header-btn:active {
+    background: var(--accent-cyan);
+    transform: scale(0.95);
+}
+
+.tempo-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 4px;
+}
+
+.tempo-btn {
+    width: 24px;
+    height: 24px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
     border-radius: 50%;
     color: var(--accent-cyan);
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.1s;
@@ -118,9 +146,9 @@ body {
 
 .tempo-display {
     font-family: var(--font-display);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--accent-yellow);
-    min-width: 40px;
+    min-width: 32px;
     text-align: center;
 }
 
@@ -184,7 +212,7 @@ body {
 /* Sound Selector Popup */
 .sound-selector {
     display: none;
-    position: absolute;
+    position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -315,7 +343,7 @@ body {
 
 .step-note {
     font-family: var(--font-display);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: var(--text-primary);
 }
 
@@ -429,57 +457,36 @@ body {
     border-radius: 6px;
     border: 1px solid var(--border-color);
     padding: 6px;
+    overflow: hidden;
 }
 
-.octave-control {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 6px;
+.keyboard-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
 }
 
-.octave-btn {
-    width: 24px;
-    height: 24px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    color: var(--accent-magenta);
-    font-size: 0.7rem;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.octave-btn:active {
-    background: var(--accent-magenta);
-    color: var(--bg-primary);
-}
-
-.octave-display {
-    font-family: var(--font-display);
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-}
-
-#octave-value {
-    color: var(--accent-magenta);
+.keyboard-wrapper::-webkit-scrollbar {
+    display: none;
 }
 
 .keyboard {
     display: flex;
     position: relative;
-    height: 70px;
+    height: 65px;
     gap: 2px;
+    min-width: max-content;
 }
 
 .key {
-    flex: 1;
+    width: 36px;
+    flex-shrink: 0;
     background: linear-gradient(180deg, #ffffff 0%, #d0d0d0 100%);
     border: none;
     border-radius: 0 0 4px 4px;
     font-family: var(--font-mono);
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: bold;
     color: #333;
     cursor: pointer;
@@ -494,11 +501,11 @@ body {
 
 .key.black {
     position: absolute;
-    width: 10%;
+    width: 24px;
     height: 55%;
     background: linear-gradient(180deg, #333 0%, #111 100%);
     color: #888;
-    font-size: 0.5rem;
+    font-size: 0.45rem;
     z-index: 2;
     border-radius: 0 0 3px 3px;
 }
@@ -518,27 +525,6 @@ body {
 .key.black.active {
     background: linear-gradient(180deg, var(--accent-magenta) 0%, #cc0088 100%);
     color: white;
-}
-
-/* Black key positions */
-.key.black[data-note="C#"] {
-    left: 6%;
-}
-
-.key.black[data-note="D#"] {
-    left: 17%;
-}
-
-.key.black[data-note="F#"] {
-    left: 40%;
-}
-
-.key.black[data-note="G#"] {
-    left: 51%;
-}
-
-.key.black[data-note="A#"] {
-    left: 62%;
 }
 
 /* ================================
@@ -593,9 +579,14 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
+    gap: 2px;
     cursor: pointer;
     position: relative;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    padding: 4px;
+    touch-action: none;
 }
 
 .track-mixer:nth-child(1) {
@@ -614,67 +605,25 @@ body {
     --mixer-color: var(--track4-color);
 }
 
-.volume-bar {
-    flex: 1;
-    width: 100%;
-    min-height: 20px;
-    background: var(--bg-tertiary);
-    border-radius: 3px;
-    position: relative;
-    overflow: hidden;
-}
-
-.volume-bar::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: var(--volume, 100%);
-    background: linear-gradient(180deg, var(--mixer-color) 0%, rgba(0, 0, 0, 0.3) 100%);
-    transition: height 0.1s;
-}
-
-.track-mixer.muted .volume-bar::after {
-    opacity: 0.2;
+.mixer-volume {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    color: var(--mixer-color);
+    font-weight: bold;
 }
 
 .track-label {
     font-family: var(--font-display);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: var(--text-muted);
 }
 
-.track-mixer.muted .track-label {
+.track-mixer.muted {
+    opacity: 0.4;
+}
+
+.track-mixer.muted .mixer-volume {
     text-decoration: line-through;
-    opacity: 0.5;
-}
-
-/* ================================
-   Footer
-   ================================ */
-.footer {
-    display: flex;
-    gap: 6px;
-}
-
-.footer-btn {
-    flex: 1;
-    padding: 8px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.footer-btn:active {
-    background: var(--bg-tertiary);
-    border-color: var(--accent-cyan);
-    color: var(--accent-cyan);
 }
 
 /* ================================
@@ -690,7 +639,7 @@ body {
     }
 
     .app-title {
-        font-size: 0.9rem;
+        font-size: 0.75rem;
     }
 }
 
