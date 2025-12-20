@@ -1,6 +1,6 @@
 /**
- * Pocket Musica - Main Application v9
- * Correct piano keyboard layout
+ * Pocket Musica - Main Application v10
+ * Copy/Paste, 6 octaves, play selection
  */
 
 class PocketMusica {
@@ -28,9 +28,9 @@ class PocketMusica {
             noise: 'NOISE'
         };
 
-        // Keyboard: 4 octaves starting from C2
-        this.keyboardStartOctave = 2;
-        this.keyboardOctaves = 4;
+        // Keyboard: 6 octaves starting from C1
+        this.keyboardStartOctave = 1;
+        this.keyboardOctaves = 6;
         this.keyboardOffset = 0;
         this.maxKeyboardOffset = 0;
 
@@ -53,6 +53,13 @@ class PocketMusica {
 
         this.scrollBarDragging = false;
 
+        // Copy/Paste
+        this.clipboard = [];
+        this.selectionStart = -1;
+        this.selectionEnd = -1;
+        this.isSelecting = false;
+        this.stepLongPressTimer = null;
+
         this.init();
     }
 
@@ -65,7 +72,7 @@ class PocketMusica {
         this.updateDisplay();
         this.preventTextSelection();
 
-        console.log('🎹 Pocket Musica v9 initialized');
+        console.log('🎹 Pocket Musica v10 initialized');
     }
 
     preventTextSelection() {
@@ -175,6 +182,14 @@ class PocketMusica {
             mixer.addEventListener('mousedown', (e) => this.onMixerMouseDown(index, e));
         });
 
+        // Grid swipe events for copy selection
+        this.stepGrid.addEventListener('mousedown', (e) => this.onGridMouseDown(e));
+        this.stepGrid.addEventListener('touchstart', (e) => this.onGridTouchStart(e), { passive: false });
+        document.addEventListener('mousemove', (e) => this.onGridMouseMove(e));
+        document.addEventListener('touchmove', (e) => this.onGridTouchMove(e), { passive: true });
+        document.addEventListener('mouseup', (e) => this.onGridMouseUp(e));
+        document.addEventListener('touchend', (e) => this.onGridTouchEnd(e));
+
         const initAudioHandler = async () => {
             await this.initAudio();
             document.removeEventListener('touchstart', initAudioHandler);
@@ -242,7 +257,7 @@ class PocketMusica {
 
         if (fileName) {
             const data = {
-                version: 9,
+                version: 10,
                 bpm: this.bpm,
                 tracks: this.tracks,
                 savedAt: new Date().toISOString()
@@ -386,11 +401,7 @@ class PocketMusica {
         const whiteKeyWidth = this.whiteKeyWidth;
         const blackKeyWidth = this.blackKeyWidth;
 
-        // White notes in order: C, D, E, F, G, A, B
         const whiteNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-
-        // Black key positions: after C(index 0), after D(index 1), after F(index 3), after G(index 4), after A(index 5)
-        // Black keys are positioned at: C#, D#, F#, G#, A#
         const blackKeyData = [
             { note: 'C#', afterWhiteIndex: 0 },
             { note: 'D#', afterWhiteIndex: 1 },
@@ -399,8 +410,6 @@ class PocketMusica {
             { note: 'A#', afterWhiteIndex: 5 }
         ];
 
-        let whiteKeyIndex = 0;
-
         // Create white keys first
         for (let oct = this.keyboardStartOctave; oct < this.keyboardStartOctave + this.keyboardOctaves; oct++) {
             const octaveIndex = oct - this.keyboardStartOctave;
@@ -408,12 +417,11 @@ class PocketMusica {
             whiteNotes.forEach((note, i) => {
                 const key = document.createElement('button');
                 key.className = 'key';
-                key.textContent = `${note}${octaveIndex}`;
+                key.textContent = `${note}${oct}`;
                 key.dataset.note = note;
                 key.dataset.octave = oct;
                 key.dataset.fullNote = `${note}${oct}`;
 
-                // Position white key
                 const leftPos = (octaveIndex * 7 + i) * whiteKeyWidth;
                 key.style.left = `${leftPos}px`;
 
@@ -422,20 +430,18 @@ class PocketMusica {
             });
         }
 
-        // Create black keys - positioned CENTERED between white keys
+        // Create black keys
         for (let oct = this.keyboardStartOctave; oct < this.keyboardStartOctave + this.keyboardOctaves; oct++) {
             const octaveIndex = oct - this.keyboardStartOctave;
 
             blackKeyData.forEach(({ note, afterWhiteIndex }) => {
                 const key = document.createElement('button');
                 key.className = 'key black';
-                key.textContent = `${note.replace('#', '♯')}${octaveIndex}`;
+                key.textContent = `${note.replace('#', '♯')}${oct}`;
                 key.dataset.note = note;
                 key.dataset.octave = oct;
                 key.dataset.fullNote = `${note}${oct}`;
 
-                // Black key is centered between two white keys
-                // Position = (whiteKeyIndex + 1) * whiteKeyWidth - (blackKeyWidth / 2)
                 const whiteKeyPosition = octaveIndex * 7 + afterWhiteIndex;
                 const leftPos = (whiteKeyPosition + 1) * whiteKeyWidth - (blackKeyWidth / 2);
                 key.style.left = `${leftPos}px`;
@@ -445,20 +451,19 @@ class PocketMusica {
             });
         }
 
-        // Calculate total width and max scroll
         const totalWhiteKeys = this.keyboardOctaves * 7;
         const totalWidth = totalWhiteKeys * whiteKeyWidth;
 
-        // Set keyboard container width
         this.keyboard.style.width = `${totalWidth}px`;
 
-        // Calculate scroll range after layout
+        // Calculate scroll range and set initial position to C3
         setTimeout(() => {
             const viewWidth = this.keyboardWrapper?.offsetWidth || 340;
             this.maxKeyboardOffset = Math.max(0, totalWidth - viewWidth);
 
-            // Start at offset 0 = C2 at left edge
-            this.setKeyboardScroll(0);
+            // Start at C3: C3 is at octave index 2 (from C1), so offset = 2 * 7 * whiteKeyWidth
+            const c3Offset = 2 * 7 * whiteKeyWidth;
+            this.setKeyboardScroll(c3Offset);
         }, 50);
     }
 
@@ -529,6 +534,196 @@ class PocketMusica {
             ? (this.keyboardOffset / this.maxKeyboardOffset) * scrollableWidth
             : 0;
         this.scrollIndicator.style.left = `${indicatorPos}px`;
+    }
+
+    // ==================== Grid Copy/Paste ====================
+
+    getStepIndexFromElement(element) {
+        const stepEl = element.closest('.step');
+        if (!stepEl) return -1;
+
+        const steps = Array.from(this.stepGrid.children);
+        const localIndex = steps.indexOf(stepEl);
+        if (localIndex === -1) return -1;
+
+        return this.currentPage * 32 + localIndex;
+    }
+
+    onGridMouseDown(e) {
+        const stepIndex = this.getStepIndexFromElement(e.target);
+        if (stepIndex === -1) return;
+
+        const track = this.tracks[this.currentTrack];
+        if (stepIndex >= track.length) return;
+
+        this.isSelecting = true;
+        this.selectionStart = stepIndex;
+        this.selectionEnd = stepIndex;
+
+        // Start long press timer for paste
+        this.stepLongPressTimer = setTimeout(() => {
+            if (this.clipboard.length > 0) {
+                this.pasteAtStep(stepIndex);
+            }
+            this.isSelecting = false;
+        }, 600);
+    }
+
+    onGridTouchStart(e) {
+        const touch = e.touches[0];
+        const element = document.elementFromPoint(touch.clientX, touch.clientY);
+        const stepIndex = this.getStepIndexFromElement(element);
+        if (stepIndex === -1) return;
+
+        const track = this.tracks[this.currentTrack];
+        if (stepIndex >= track.length) return;
+
+        this.isSelecting = true;
+        this.selectionStart = stepIndex;
+        this.selectionEnd = stepIndex;
+
+        // Start long press timer for paste
+        this.stepLongPressTimer = setTimeout(() => {
+            if (this.clipboard.length > 0) {
+                this.pasteAtStep(stepIndex);
+            }
+            this.isSelecting = false;
+        }, 600);
+    }
+
+    onGridMouseMove(e) {
+        if (!this.isSelecting) return;
+
+        // Cancel long press if moving
+        if (this.stepLongPressTimer) {
+            clearTimeout(this.stepLongPressTimer);
+            this.stepLongPressTimer = null;
+        }
+
+        const stepIndex = this.getStepIndexFromElement(e.target);
+        if (stepIndex === -1) return;
+
+        const track = this.tracks[this.currentTrack];
+        if (stepIndex >= track.length) return;
+
+        this.selectionEnd = stepIndex;
+        this.renderGrid();
+    }
+
+    onGridTouchMove(e) {
+        if (!this.isSelecting) return;
+
+        // Cancel long press if moving
+        if (this.stepLongPressTimer) {
+            clearTimeout(this.stepLongPressTimer);
+            this.stepLongPressTimer = null;
+        }
+
+        const touch = e.touches[0];
+        const element = document.elementFromPoint(touch.clientX, touch.clientY);
+        const stepIndex = this.getStepIndexFromElement(element);
+        if (stepIndex === -1) return;
+
+        const track = this.tracks[this.currentTrack];
+        if (stepIndex >= track.length) return;
+
+        this.selectionEnd = stepIndex;
+        this.renderGrid();
+    }
+
+    onGridMouseUp(e) {
+        if (this.stepLongPressTimer) {
+            clearTimeout(this.stepLongPressTimer);
+            this.stepLongPressTimer = null;
+        }
+
+        if (!this.isSelecting) return;
+        this.isSelecting = false;
+
+        const start = Math.min(this.selectionStart, this.selectionEnd);
+        const end = Math.max(this.selectionStart, this.selectionEnd);
+
+        if (start === end) {
+            // Single tap - just select
+            this.selectedStep = start;
+            this.selectionStart = -1;
+            this.selectionEnd = -1;
+
+            const track = this.tracks[this.currentTrack];
+            const step = track.pattern[start];
+            if (step.type === 'note' && step.note) {
+                audioEngine.resume();
+                audioEngine.playNote(step.note, track.soundType, 0.2, this.currentTrack);
+            }
+        } else {
+            // Range selection - copy
+            this.copyRange(start, end);
+        }
+
+        this.renderGrid();
+    }
+
+    onGridTouchEnd(e) {
+        if (this.stepLongPressTimer) {
+            clearTimeout(this.stepLongPressTimer);
+            this.stepLongPressTimer = null;
+        }
+
+        if (!this.isSelecting) return;
+        this.isSelecting = false;
+
+        const start = Math.min(this.selectionStart, this.selectionEnd);
+        const end = Math.max(this.selectionStart, this.selectionEnd);
+
+        if (start === end) {
+            // Single tap - just select
+            this.selectedStep = start;
+            this.selectionStart = -1;
+            this.selectionEnd = -1;
+
+            const track = this.tracks[this.currentTrack];
+            const step = track.pattern[start];
+            if (step.type === 'note' && step.note) {
+                audioEngine.resume();
+                audioEngine.playNote(step.note, track.soundType, 0.2, this.currentTrack);
+            }
+        } else {
+            // Range selection - copy
+            this.copyRange(start, end);
+        }
+
+        this.renderGrid();
+    }
+
+    copyRange(start, end) {
+        const track = this.tracks[this.currentTrack];
+        this.clipboard = [];
+
+        for (let i = start; i <= end; i++) {
+            this.clipboard.push({ ...track.pattern[i] });
+        }
+
+        this.selectionStart = -1;
+        this.selectionEnd = -1;
+        this.showToast(`📋 ${this.clipboard.length}ステップをコピー`);
+    }
+
+    pasteAtStep(startIndex) {
+        if (this.clipboard.length === 0) return;
+
+        const track = this.tracks[this.currentTrack];
+
+        for (let i = 0; i < this.clipboard.length; i++) {
+            const targetIndex = startIndex + i;
+            if (targetIndex >= track.length) break;
+            track.pattern[targetIndex] = { ...this.clipboard[i] };
+        }
+
+        this.selectionStart = -1;
+        this.selectionEnd = -1;
+        this.renderGrid();
+        this.autoSave();
+        this.showToast(`📋 ${this.clipboard.length}ステップを貼り付け`);
     }
 
     // ==================== Pattern Input ====================
@@ -623,10 +818,14 @@ class PocketMusica {
         const startStep = this.currentPage * 32;
         const endStep = startStep + 32;
 
+        const selStart = Math.min(this.selectionStart, this.selectionEnd);
+        const selEnd = Math.max(this.selectionStart, this.selectionEnd);
+
         for (let i = startStep; i < endStep; i++) {
             const step = pattern[i];
             const stepEl = document.createElement('div');
             stepEl.className = 'step';
+            stepEl.dataset.index = i;
 
             if (step.type === 'note') stepEl.classList.add('has-note');
             if (step.type === 'rest') stepEl.classList.add('rest');
@@ -634,6 +833,11 @@ class PocketMusica {
             if (i >= track.length) stepEl.classList.add('out-of-range');
             if (i === this.trackPositions[this.currentTrack] && this.isPlaying) stepEl.classList.add('current');
             if (i === this.selectedStep && i < track.length) stepEl.classList.add('selected');
+
+            // Selection range highlight
+            if (this.selectionStart !== -1 && i >= selStart && i <= selEnd && i < track.length) {
+                stepEl.classList.add('in-selection');
+            }
 
             const numEl = document.createElement('span');
             numEl.className = 'step-number';
@@ -651,35 +855,8 @@ class PocketMusica {
             }
             stepEl.appendChild(noteEl);
 
-            stepEl.addEventListener('click', () => this.onStepClick(i));
-
             this.stepGrid.appendChild(stepEl);
         }
-    }
-
-    onStepClick(index) {
-        const track = this.tracks[this.currentTrack];
-        if (index >= track.length) return;
-
-        const now = Date.now();
-
-        if (this.lastTapStep === index && now - this.lastTapTime < 300) {
-            track.pattern[index] = { note: null, type: 'empty' };
-            this.lastTapStep = -1;
-        } else {
-            this.selectedStep = index;
-
-            const step = track.pattern[index];
-            if (step.type === 'note' && step.note) {
-                audioEngine.resume();
-                audioEngine.playNote(step.note, track.soundType, 0.2, this.currentTrack);
-            }
-        }
-
-        this.lastTapTime = now;
-        this.lastTapStep = index;
-        this.renderGrid();
-        this.autoSave();
     }
 
     // ==================== Playback ====================
@@ -743,13 +920,6 @@ class PocketMusica {
                         }
                     }
                 }
-            }
-
-            const playingPos = this.trackPositions[this.currentTrack];
-            const newPage = Math.floor(playingPos / 32);
-            if (newPage !== this.currentPage && newPage < 2) {
-                this.currentPage = newPage;
-                this.updatePageButtons();
             }
 
             this.renderGrid();
@@ -916,7 +1086,7 @@ class PocketMusica {
 
     autoSave() {
         const data = {
-            version: 9,
+            version: 10,
             bpm: this.bpm,
             tracks: this.tracks,
             savedAt: new Date().toISOString()
