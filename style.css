@@ -1,6 +1,6 @@
 /* ================================
-   Pocket Musica - Style v7
-   iOS touch optimized
+   Pocket Musica - Style v8
+   Fixed keyboard layout
    ================================ */
 
 :root {
@@ -114,6 +114,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    -webkit-appearance: none;
+    appearance: none;
+    touch-action: manipulation;
 }
 
 .header-btn:active {
@@ -138,6 +141,8 @@ body {
     font-size: 0.9rem;
     font-weight: bold;
     cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .tempo-btn:active {
@@ -174,6 +179,8 @@ body {
     color: var(--text-muted);
     font-family: var(--font-mono);
     cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .track-tab:nth-child(1) {
@@ -239,6 +246,8 @@ body {
     font-family: var(--font-display);
     font-size: 0.85rem;
     cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .sound-option:active {
@@ -292,6 +301,8 @@ body {
     font-size: 0.7rem;
     cursor: pointer;
     transition: all 0.1s;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .ctrl-btn:active {
@@ -320,7 +331,7 @@ body {
     background: rgba(0, 240, 255, 0.1);
 }
 
-/* Page controls - more space above */
+/* Page controls - smaller */
 .page-controls {
     display: flex;
     gap: 4px;
@@ -330,20 +341,22 @@ body {
 
 .page-btn {
     flex: 1;
-    padding: 5px 10px;
+    padding: 3px 8px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     color: var(--text-muted);
     font-family: var(--font-display);
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .page-btn.active {
-    border-color: var(--text-primary);
-    color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.1);
+    border-color: #666;
+    color: #aaa;
+    background: rgba(128, 128, 128, 0.2);
 }
 
 .page-btn.disabled {
@@ -435,7 +448,7 @@ body {
 }
 
 /* ================================
-   Sequencer Controls - iOS optimized
+   Sequencer Controls
    ================================ */
 .seq-controls {
     display: flex;
@@ -456,7 +469,6 @@ body {
     border-radius: 6px;
     color: var(--text-secondary);
     cursor: pointer;
-    /* iOS touch optimization */
     -webkit-appearance: none;
     appearance: none;
     touch-action: manipulation;
@@ -477,12 +489,6 @@ body {
     font-family: var(--font-display);
 }
 
-/* Play button - same color as other buttons when inactive */
-.play-btn {
-    /* Same as other seq-btn by default */
-}
-
-/* Play button blinking when playing */
 .play-btn.playing {
     border-color: var(--accent-green);
     color: var(--accent-green);
@@ -521,7 +527,7 @@ body {
 }
 
 /* ================================
-   Keyboard Section
+   Keyboard Section - Fixed layout
    ================================ */
 .keyboard-section {
     background: var(--bg-secondary);
@@ -560,20 +566,21 @@ body {
     touch-action: none;
 }
 
+/* Piano keyboard - proper layout */
 .keyboard {
     display: flex;
     position: relative;
     height: 90px;
-    gap: 3px;
     min-width: max-content;
     transition: transform 0.1s ease-out;
 }
 
+/* White keys - no gap, flush against each other */
 .key {
     width: 48px;
     flex-shrink: 0;
     background: linear-gradient(180deg, #ffffff 0%, #d0d0d0 100%);
-    border: none;
+    border: 1px solid #999;
     border-radius: 0 0 6px 6px;
     font-family: var(--font-mono);
     font-size: 0.65rem;
@@ -589,24 +596,32 @@ body {
     touch-action: manipulation;
     -webkit-appearance: none;
     appearance: none;
+    margin: 0;
 }
 
+/* Black keys */
 .key.black {
     position: absolute;
-    width: 32px;
+    width: 30px;
     height: 55%;
     background: linear-gradient(180deg, #333 0%, #111 100%);
+    border: 1px solid #000;
     color: #888;
     font-size: 0.5rem;
     z-index: 2;
     border-radius: 0 0 4px 4px;
+    margin-left: -15px;
 }
 
 .key:active,
 .key.active {
-    transform: scaleY(0.96);
     background: linear-gradient(180deg, var(--accent-cyan) 0%, #00c0cc 100%);
     color: var(--bg-primary);
+}
+
+.key.black:active,
+.key.black.active {
+    background: linear-gradient(180deg, var(--accent-cyan) 0%, #00a0aa 100%);
 }
 
 /* ================================
@@ -668,12 +683,9 @@ body {
     color: var(--text-muted);
 }
 
+/* Muted - just opacity, no strikethrough */
 .track-mixer.muted {
     opacity: 0.4;
-}
-
-.track-mixer.muted .mixer-volume {
-    text-decoration: line-through;
 }
 
 /* ================================
@@ -689,7 +701,8 @@ body {
     }
 
     .key.black {
-        width: 28px;
+        width: 26px;
+        margin-left: -13px;
     }
 }
 
@@ -703,7 +716,8 @@ body {
     }
 
     .key.black {
-        width: 25px;
+        width: 24px;
+        margin-left: -12px;
     }
 
     .seq-btn {
