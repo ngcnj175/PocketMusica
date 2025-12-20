@@ -1,6 +1,6 @@
 /* ================================
-   Pocket Musica - Style v8
-   Fixed keyboard layout
+   Pocket Musica - Style v9
+   Correct piano keyboard layout
    ================================ */
 
 :root {
@@ -31,6 +31,10 @@
     /* Fonts */
     --font-display: 'Orbitron', monospace;
     --font-mono: 'Share Tech Mono', monospace;
+
+    /* Keyboard dimensions */
+    --white-key-width: 44px;
+    --black-key-width: 28px;
 }
 
 * {
@@ -331,7 +335,7 @@ body {
     background: rgba(0, 240, 255, 0.1);
 }
 
-/* Page controls - smaller */
+/* Page controls */
 .page-controls {
     display: flex;
     gap: 4px;
@@ -364,7 +368,7 @@ body {
     pointer-events: none;
 }
 
-/* Step Grid - 8x4 = 32 steps */
+/* Step Grid */
 .step-grid {
     flex: 1;
     display: grid;
@@ -527,7 +531,7 @@ body {
 }
 
 /* ================================
-   Keyboard Section - Fixed layout
+   Keyboard Section - Correct piano layout
    ================================ */
 .keyboard-section {
     background: var(--bg-secondary);
@@ -566,24 +570,25 @@ body {
     touch-action: none;
 }
 
-/* Piano keyboard - proper layout */
+/* Piano keyboard container */
 .keyboard {
-    display: flex;
     position: relative;
     height: 90px;
     min-width: max-content;
     transition: transform 0.1s ease-out;
 }
 
-/* White keys - no gap, flush against each other */
+/* White keys - positioned absolutely */
 .key {
-    width: 48px;
-    flex-shrink: 0;
+    position: absolute;
+    top: 0;
+    width: var(--white-key-width);
+    height: 100%;
     background: linear-gradient(180deg, #ffffff 0%, #d0d0d0 100%);
     border: 1px solid #999;
     border-radius: 0 0 6px 6px;
     font-family: var(--font-mono);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: bold;
     color: #333;
     cursor: pointer;
@@ -591,26 +596,22 @@ body {
     align-items: flex-end;
     justify-content: center;
     padding-bottom: 4px;
-    position: relative;
     z-index: 1;
     touch-action: manipulation;
     -webkit-appearance: none;
     appearance: none;
-    margin: 0;
 }
 
-/* Black keys */
+/* Black keys - positioned absolutely, centered between white keys */
 .key.black {
-    position: absolute;
-    width: 30px;
+    width: var(--black-key-width);
     height: 55%;
     background: linear-gradient(180deg, #333 0%, #111 100%);
     border: 1px solid #000;
     color: #888;
-    font-size: 0.5rem;
+    font-size: 0.45rem;
     z-index: 2;
     border-radius: 0 0 4px 4px;
-    margin-left: -15px;
 }
 
 .key:active,
@@ -683,7 +684,6 @@ body {
     color: var(--text-muted);
 }
 
-/* Muted - just opacity, no strikethrough */
 .track-mixer.muted {
     opacity: 0.4;
 }
@@ -692,32 +692,24 @@ body {
    Responsive
    ================================ */
 @media (max-height: 700px) {
+    :root {
+        --white-key-width: 38px;
+        --black-key-width: 24px;
+    }
+
     .keyboard {
         height: 75px;
-    }
-
-    .key {
-        width: 42px;
-    }
-
-    .key.black {
-        width: 26px;
-        margin-left: -13px;
     }
 }
 
 @media (max-height: 600px) {
+    :root {
+        --white-key-width: 34px;
+        --black-key-width: 22px;
+    }
+
     .keyboard {
         height: 65px;
-    }
-
-    .key {
-        width: 38px;
-    }
-
-    .key.black {
-        width: 24px;
-        margin-left: -12px;
     }
 
     .seq-btn {

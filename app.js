@@ -1,6 +1,6 @@
 /**
- * Pocket Musica - Main Application v8
- * Fixed keyboard layout and iOS buttons
+ * Pocket Musica - Main Application v9
+ * Correct piano keyboard layout
  */
 
 class PocketMusica {
@@ -28,10 +28,15 @@ class PocketMusica {
             noise: 'NOISE'
         };
 
+        // Keyboard: 4 octaves starting from C2
         this.keyboardStartOctave = 2;
         this.keyboardOctaves = 4;
         this.keyboardOffset = 0;
         this.maxKeyboardOffset = 0;
+
+        // Key dimensions (match CSS)
+        this.whiteKeyWidth = 44;
+        this.blackKeyWidth = 28;
 
         this.longPressTimer = null;
         this.longPressTrack = null;
@@ -60,7 +65,7 @@ class PocketMusica {
         this.updateDisplay();
         this.preventTextSelection();
 
-        console.log('🎹 Pocket Musica v8 initialized');
+        console.log('🎹 Pocket Musica v9 initialized');
     }
 
     preventTextSelection() {
@@ -104,19 +109,14 @@ class PocketMusica {
     }
 
     bindEvents() {
-        // Tempo
         this.addTouchEvent(this.tempoDownBtn, () => this.changeTempo(-1));
         this.addTouchEvent(this.tempoUpBtn, () => this.changeTempo(1));
 
-        // Header - iOS fixed
         this.addTouchEvent(this.clearBtn, () => this.clearAll());
-        this.addTouchEvent(this.loadBtn, () => {
-            this.fileInput.click();
-        });
+        this.addTouchEvent(this.loadBtn, () => this.fileInput.click());
         this.addTouchEvent(this.saveBtn, () => this.saveToFile());
         this.fileInput.addEventListener('change', (e) => this.loadFromFile(e));
 
-        // Track tabs
         this.trackTabs.querySelectorAll('.track-tab').forEach((tab, index) => {
             tab.addEventListener('mousedown', (e) => this.onTrackTabDown(index, e));
             tab.addEventListener('touchstart', (e) => { e.preventDefault(); this.onTrackTabDown(index, e); }, { passive: false });
@@ -126,7 +126,6 @@ class PocketMusica {
             tab.addEventListener('touchcancel', () => this.cancelLongPress());
         });
 
-        // Sound selector
         this.soundSelector.querySelectorAll('.sound-option').forEach(btn => {
             this.addTouchEvent(btn, () => this.selectSound(btn.dataset.sound));
         });
@@ -137,14 +136,12 @@ class PocketMusica {
             }
         });
 
-        // Seq controls
         this.addTouchEvent(this.restBtn, () => this.insertRest());
         this.addTouchEvent(this.tieBtn, () => this.insertTie());
         this.addTouchEvent(this.recBtn, () => this.toggleRecording());
         this.addTouchEvent(this.playStopBtn, () => this.togglePlay());
         this.addTouchEvent(this.delBtn, () => this.handleDelete());
 
-        // DEL long press
         this.delBtn.addEventListener('mousedown', () => this.startDelLongPress());
         this.delBtn.addEventListener('touchstart', () => this.startDelLongPress(), { passive: true });
         this.delBtn.addEventListener('mouseup', () => this.cancelDelLongPress());
@@ -152,7 +149,6 @@ class PocketMusica {
         this.delBtn.addEventListener('mouseleave', () => this.cancelDelLongPress());
         this.delBtn.addEventListener('touchcancel', () => this.cancelDelLongPress());
 
-        // Control buttons
         this.lenButtons.forEach(btn => {
             this.addTouchEvent(btn, () => this.changeLength(parseInt(btn.dataset.length)));
         });
@@ -161,12 +157,10 @@ class PocketMusica {
         });
         this.addTouchEvent(this.loopBtn, () => this.toggleLoop());
 
-        // Page buttons
         this.pageButtons.forEach(btn => {
             this.addTouchEvent(btn, () => this.switchPage(parseInt(btn.dataset.page)));
         });
 
-        // Keyboard scroll
         this.scrollBar.addEventListener('mousedown', (e) => this.onScrollBarStart(e));
         this.scrollBar.addEventListener('touchstart', (e) => this.onScrollBarStart(e), { passive: false });
         document.addEventListener('mousemove', (e) => this.onScrollBarMove(e));
@@ -174,7 +168,6 @@ class PocketMusica {
         document.addEventListener('mouseup', () => this.onScrollBarEnd());
         document.addEventListener('touchend', () => this.onScrollBarEnd());
 
-        // Mixer
         this.trackMixers.forEach((mixer, index) => {
             mixer.addEventListener('touchstart', (e) => this.onMixerTouchStart(index, e), { passive: false });
             mixer.addEventListener('touchmove', (e) => this.onMixerTouchMove(index, e), { passive: true });
@@ -182,7 +175,6 @@ class PocketMusica {
             mixer.addEventListener('mousedown', (e) => this.onMixerMouseDown(index, e));
         });
 
-        // Init audio
         const initAudioHandler = async () => {
             await this.initAudio();
             document.removeEventListener('touchstart', initAudioHandler);
@@ -250,7 +242,7 @@ class PocketMusica {
 
         if (fileName) {
             const data = {
-                version: 8,
+                version: 9,
                 bpm: this.bpm,
                 tracks: this.tracks,
                 savedAt: new Date().toISOString()
@@ -391,23 +383,29 @@ class PocketMusica {
     renderKeyboard() {
         this.keyboard.innerHTML = '';
 
-        // Key width WITHOUT gap (keys touch each other)
-        const keyWidth = 48;
-        const totalWhiteKeys = this.keyboardOctaves * 7;
-        const totalWidth = totalWhiteKeys * keyWidth;
+        const whiteKeyWidth = this.whiteKeyWidth;
+        const blackKeyWidth = this.blackKeyWidth;
 
-        setTimeout(() => {
-            const viewWidth = this.keyboardWrapper?.offsetWidth || 340;
-            this.maxKeyboardOffset = Math.max(0, totalWidth - viewWidth);
-            // Start at C2 (offset = 0)
-            this.setKeyboardScroll(0);
-        }, 100);
+        // White notes in order: C, D, E, F, G, A, B
+        const whiteNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+        // Black key positions: after C(index 0), after D(index 1), after F(index 3), after G(index 4), after A(index 5)
+        // Black keys are positioned at: C#, D#, F#, G#, A#
+        const blackKeyData = [
+            { note: 'C#', afterWhiteIndex: 0 },
+            { note: 'D#', afterWhiteIndex: 1 },
+            { note: 'F#', afterWhiteIndex: 3 },
+            { note: 'G#', afterWhiteIndex: 4 },
+            { note: 'A#', afterWhiteIndex: 5 }
+        ];
+
+        let whiteKeyIndex = 0;
 
         // Create white keys first
         for (let oct = this.keyboardStartOctave; oct < this.keyboardStartOctave + this.keyboardOctaves; oct++) {
             const octaveIndex = oct - this.keyboardStartOctave;
 
-            ['C', 'D', 'E', 'F', 'G', 'A', 'B'].forEach((note, noteIdx) => {
+            whiteNotes.forEach((note, i) => {
                 const key = document.createElement('button');
                 key.className = 'key';
                 key.textContent = `${note}${octaveIndex}`;
@@ -415,25 +413,20 @@ class PocketMusica {
                 key.dataset.octave = oct;
                 key.dataset.fullNote = `${note}${oct}`;
 
+                // Position white key
+                const leftPos = (octaveIndex * 7 + i) * whiteKeyWidth;
+                key.style.left = `${leftPos}px`;
+
                 this.addKeyEvents(key);
                 this.keyboard.appendChild(key);
             });
         }
 
-        // Create black keys with correct positioning
-        // Black keys are positioned between specific white keys
-        const blackKeyPositions = {
-            'C#': 0.65,  // Between C and D
-            'D#': 1.65,  // Between D and E
-            'F#': 3.65,  // Between F and G
-            'G#': 4.65,  // Between G and A
-            'A#': 5.65   // Between A and B
-        };
-
+        // Create black keys - positioned CENTERED between white keys
         for (let oct = this.keyboardStartOctave; oct < this.keyboardStartOctave + this.keyboardOctaves; oct++) {
             const octaveIndex = oct - this.keyboardStartOctave;
 
-            Object.entries(blackKeyPositions).forEach(([note, position]) => {
+            blackKeyData.forEach(({ note, afterWhiteIndex }) => {
                 const key = document.createElement('button');
                 key.className = 'key black';
                 key.textContent = `${note.replace('#', '♯')}${octaveIndex}`;
@@ -441,14 +434,32 @@ class PocketMusica {
                 key.dataset.octave = oct;
                 key.dataset.fullNote = `${note}${oct}`;
 
-                // Position based on white key positions
-                const leftPos = (octaveIndex * 7 + position) * keyWidth;
+                // Black key is centered between two white keys
+                // Position = (whiteKeyIndex + 1) * whiteKeyWidth - (blackKeyWidth / 2)
+                const whiteKeyPosition = octaveIndex * 7 + afterWhiteIndex;
+                const leftPos = (whiteKeyPosition + 1) * whiteKeyWidth - (blackKeyWidth / 2);
                 key.style.left = `${leftPos}px`;
 
                 this.addKeyEvents(key);
                 this.keyboard.appendChild(key);
             });
         }
+
+        // Calculate total width and max scroll
+        const totalWhiteKeys = this.keyboardOctaves * 7;
+        const totalWidth = totalWhiteKeys * whiteKeyWidth;
+
+        // Set keyboard container width
+        this.keyboard.style.width = `${totalWidth}px`;
+
+        // Calculate scroll range after layout
+        setTimeout(() => {
+            const viewWidth = this.keyboardWrapper?.offsetWidth || 340;
+            this.maxKeyboardOffset = Math.max(0, totalWidth - viewWidth);
+
+            // Start at offset 0 = C2 at left edge
+            this.setKeyboardScroll(0);
+        }, 50);
     }
 
     addKeyEvents(key) {
@@ -905,7 +916,7 @@ class PocketMusica {
 
     autoSave() {
         const data = {
-            version: 8,
+            version: 9,
             bpm: this.bpm,
             tracks: this.tracks,
             savedAt: new Date().toISOString()
