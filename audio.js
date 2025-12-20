@@ -1,24 +1,24 @@
 /**
- * PocketMusica - Audio Engine v2
+ * PocketMusica - Audio Engine v3
  * Multi-track chiptune synthesizer
+ * Optimized for iOS Safari
  */
 
 class ChiptuneAudio {
     constructor() {
         this.audioContext = null;
         this.masterGain = null;
-        this.trackGains = []; // Per-track gain nodes
+        this.trackGains = [];
         this.trackMuted = [false, false, false, false];
         this.trackVolumes = [1, 1, 1, 1];
         this.isInitialized = false;
-        this.activeOscillators = new Map(); // Track active oscillators for sustained notes
+        this.activeOscillators = new Map();
 
-        // Sound types
         this.soundTypes = {
             pulse1: { type: 'square', detune: 0 },
             pulse2: { type: 'square', detune: 5 },
             triangle: { type: 'triangle', detune: 0 },
-            noise: { type: 'sawtooth', detune: 0 } // Approximation for noise
+            noise: { type: 'sawtooth', detune: 0 }
         };
     }
 
@@ -26,7 +26,9 @@ class ChiptuneAudio {
         if (this.isInitialized) return;
 
         try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // iOS Safari requires webkitAudioContext
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            this.audioContext = new AudioContextClass();
 
             // Master gain
             this.masterGain = this.audioContext.createGain();
@@ -43,14 +45,42 @@ class ChiptuneAudio {
 
             this.isInitialized = true;
             console.log('🎵 Audio engine initialized');
+
+            // iOS: Force resume immediately after user interaction
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+
+            // iOS: Play silent sound to unlock audio
+            this.playSilent();
+
         } catch (error) {
             console.error('Failed to initialize audio:', error);
         }
     }
 
+    // Play a silent sound to unlock iOS audio
+    playSilent() {
+        if (!this.audioContext) return;
+
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+
+        gainNode.gain.value = 0.001; // Almost silent
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+
+        oscillator.start();
+        oscillator.stop(this.audioContext.currentTime + 0.1);
+    }
+
     async resume() {
         if (this.audioContext && this.audioContext.state === 'suspended') {
-            await this.audioContext.resume();
+            try {
+                await this.audioContext.resume();
+            } catch (e) {
+                console.log('Resume failed, will retry on next interaction');
+            }
         }
     }
 
@@ -68,9 +98,6 @@ class ChiptuneAudio {
         return 440 * Math.pow(2, semitonesFromA4 / 12);
     }
 
-    /**
-     * Start a sustained note (for keyboard hold)
-     */
     startNote(noteName, soundType = 'pulse1', trackIndex = 0) {
         if (!this.isInitialized) return null;
 
@@ -88,7 +115,6 @@ class ChiptuneAudio {
         oscillator.frequency.setValueAtTime(frequency, now);
         oscillator.detune.setValueAtTime(sound.detune, now);
 
-        // Quick attack
         gainNode.gain.setValueAtTime(0, now);
         gainNode.gain.linearRampToValueAtTime(0.6, now + 0.02);
 
@@ -101,9 +127,6 @@ class ChiptuneAudio {
         return key;
     }
 
-    /**
-     * Stop a sustained note
-     */
     stopNote(noteName, trackIndex = 0) {
         const key = `${trackIndex}-${noteName}`;
         const active = this.activeOscillators.get(key);
@@ -121,9 +144,6 @@ class ChiptuneAudio {
         this.activeOscillators.delete(key);
     }
 
-    /**
-     * Stop all notes for a track
-     */
     stopAllNotes(trackIndex = null) {
         for (const [key, active] of this.activeOscillators) {
             if (trackIndex === null || key.startsWith(`${trackIndex}-`)) {
@@ -135,9 +155,6 @@ class ChiptuneAudio {
         }
     }
 
-    /**
-     * Play a note with fixed duration (for sequencer playback)
-     */
     playNote(noteName, soundType = 'pulse1', duration = 0.15, trackIndex = 0) {
         if (!this.isInitialized || this.trackMuted[trackIndex]) return;
 
@@ -152,7 +169,6 @@ class ChiptuneAudio {
         oscillator.frequency.setValueAtTime(frequency, now);
         oscillator.detune.setValueAtTime(sound.detune, now);
 
-        // Chiptune envelope
         gainNode.gain.setValueAtTime(0, now);
         gainNode.gain.linearRampToValueAtTime(0.6, now + 0.01);
         gainNode.gain.linearRampToValueAtTime(0.4, now + 0.03);
@@ -171,21 +187,15 @@ class ChiptuneAudio {
         };
     }
 
-    /**
-     * Play sequencer step
-     */
     playStep(step, soundType, stepDuration, trackIndex) {
         if (!step || step.type === 'rest') return;
-        if (step.type === 'tie') return; // TIE handled by caller
+        if (step.type === 'tie') return;
 
         if (step.note) {
             this.playNote(step.note, soundType, stepDuration * 0.9, trackIndex);
         }
     }
 
-    /**
-     * Set track volume
-     */
     setTrackVolume(trackIndex, volume) {
         if (this.trackGains[trackIndex]) {
             this.trackVolumes[trackIndex] = volume;
@@ -195,9 +205,6 @@ class ChiptuneAudio {
         }
     }
 
-    /**
-     * Toggle track mute
-     */
     toggleMute(trackIndex) {
         this.trackMuted[trackIndex] = !this.trackMuted[trackIndex];
         if (this.trackGains[trackIndex]) {
@@ -206,9 +213,6 @@ class ChiptuneAudio {
         return this.trackMuted[trackIndex];
     }
 
-    /**
-     * Check if track is muted
-     */
     isMuted(trackIndex) {
         return this.trackMuted[trackIndex];
     }

@@ -1,11 +1,10 @@
 /**
- * Pocket Musica - Main Application v6
- * 32-step display with page switching
+ * Pocket Musica - Main Application v7
+ * iOS touch optimized
  */
 
 class PocketMusica {
     constructor() {
-        // State
         this.bpm = 120;
         this.currentStep = 0;
         this.selectedStep = 0;
@@ -13,9 +12,8 @@ class PocketMusica {
         this.isRecording = false;
         this.playInterval = null;
         this.currentTrack = 0;
-        this.currentPage = 0; // 0 = steps 1-32, 1 = steps 33-64
+        this.currentPage = 0;
 
-        // Track data
         this.tracks = [
             { pattern: this.createEmptyPattern(), soundType: 'pulse1', volume: 100, muted: false, division: 16, length: 16, loop: true },
             { pattern: this.createEmptyPattern(), soundType: 'pulse2', volume: 100, muted: false, division: 16, length: 16, loop: true },
@@ -23,7 +21,6 @@ class PocketMusica {
             { pattern: this.createEmptyPattern(), soundType: 'noise', volume: 100, muted: false, division: 16, length: 16, loop: true }
         ];
 
-        // Sound type labels
         this.soundLabels = {
             pulse1: 'PULSE',
             pulse2: 'PULSE',
@@ -31,30 +28,24 @@ class PocketMusica {
             noise: 'NOISE'
         };
 
-        // Keyboard settings - 4 octaves
         this.keyboardStartOctave = 2;
         this.keyboardOctaves = 4;
         this.keyboardOffset = 0;
         this.maxKeyboardOffset = 0;
 
-        // Long press
         this.longPressTimer = null;
         this.longPressTrack = null;
         this.delLongPressTimer = null;
 
-        // Double tap
         this.lastTapTime = 0;
         this.lastTapStep = -1;
 
-        // Mixer
         this.mixerTouchStart = {};
         this.mixerDoubleTapTime = {};
 
-        // Playback
         this.trackCounters = [0, 0, 0, 0];
         this.trackPositions = [0, 0, 0, 0];
 
-        // Scroll bar
         this.scrollBarDragging = false;
 
         this.init();
@@ -69,7 +60,7 @@ class PocketMusica {
         this.updateDisplay();
         this.preventTextSelection();
 
-        console.log('🎹 Pocket Musica v6 initialized');
+        console.log('🎹 Pocket Musica v7 initialized');
     }
 
     preventTextSelection() {
@@ -114,19 +105,19 @@ class PocketMusica {
 
     bindEvents() {
         // Tempo
-        this.tempoDownBtn.addEventListener('click', () => this.changeTempo(-1));
-        this.tempoUpBtn.addEventListener('click', () => this.changeTempo(1));
+        this.addTouchEvent(this.tempoDownBtn, () => this.changeTempo(-1));
+        this.addTouchEvent(this.tempoUpBtn, () => this.changeTempo(1));
 
         // Header
-        this.clearBtn.addEventListener('click', () => this.clearAll());
-        this.loadBtn.addEventListener('click', () => this.fileInput.click());
-        this.saveBtn.addEventListener('click', () => this.saveToFile());
+        this.addTouchEvent(this.clearBtn, () => this.clearAll());
+        this.addTouchEvent(this.loadBtn, () => this.fileInput.click());
+        this.addTouchEvent(this.saveBtn, () => this.saveToFile());
         this.fileInput.addEventListener('change', (e) => this.loadFromFile(e));
 
         // Track tabs
         this.trackTabs.querySelectorAll('.track-tab').forEach((tab, index) => {
             tab.addEventListener('mousedown', (e) => this.onTrackTabDown(index, e));
-            tab.addEventListener('touchstart', (e) => this.onTrackTabDown(index, e));
+            tab.addEventListener('touchstart', (e) => { e.preventDefault(); this.onTrackTabDown(index, e); }, { passive: false });
             tab.addEventListener('mouseup', () => this.onTrackTabUp(index));
             tab.addEventListener('touchend', () => this.onTrackTabUp(index));
             tab.addEventListener('mouseleave', () => this.cancelLongPress());
@@ -135,7 +126,7 @@ class PocketMusica {
 
         // Sound selector
         this.soundSelector.querySelectorAll('.sound-option').forEach(btn => {
-            btn.addEventListener('click', () => this.selectSound(btn.dataset.sound));
+            this.addTouchEvent(btn, () => this.selectSound(btn.dataset.sound));
         });
 
         document.addEventListener('click', (e) => {
@@ -144,28 +135,22 @@ class PocketMusica {
             }
         });
 
-        // Seq controls - fix event binding
-        this.restBtn.addEventListener('click', (e) => { e.preventDefault(); this.insertRest(); });
-        this.tieBtn.addEventListener('click', (e) => { e.preventDefault(); this.insertTie(); });
+        // Seq controls - iOS optimized
+        this.addTouchEvent(this.restBtn, () => this.insertRest());
+        this.addTouchEvent(this.tieBtn, () => this.insertTie());
 
-        // REC button - fixed toggle
-        this.recBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.toggleRecording();
-        });
+        // REC button - single touch handler
+        this.addTouchEvent(this.recBtn, () => this.toggleRecording());
 
-        // PLAY/STOP button - fixed
-        this.playStopBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.togglePlay();
-        });
+        // PLAY/STOP button - single touch handler
+        this.addTouchEvent(this.playStopBtn, () => this.togglePlay());
 
-        // DEL button
-        this.delBtn.addEventListener('click', (e) => { e.preventDefault(); this.handleDelete(); });
+        // DEL button - regular click + long press
+        this.addTouchEvent(this.delBtn, () => this.handleDelete());
+
+        // DEL long press
         this.delBtn.addEventListener('mousedown', () => this.startDelLongPress());
-        this.delBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.startDelLongPress(); });
+        this.delBtn.addEventListener('touchstart', () => this.startDelLongPress(), { passive: true });
         this.delBtn.addEventListener('mouseup', () => this.cancelDelLongPress());
         this.delBtn.addEventListener('touchend', () => this.cancelDelLongPress());
         this.delBtn.addEventListener('mouseleave', () => this.cancelDelLongPress());
@@ -173,37 +158,66 @@ class PocketMusica {
 
         // Control buttons
         this.lenButtons.forEach(btn => {
-            btn.addEventListener('click', () => this.changeLength(parseInt(btn.dataset.length)));
+            this.addTouchEvent(btn, () => this.changeLength(parseInt(btn.dataset.length)));
         });
         this.divButtons.forEach(btn => {
-            btn.addEventListener('click', () => this.changeDivision(parseInt(btn.dataset.division)));
+            this.addTouchEvent(btn, () => this.changeDivision(parseInt(btn.dataset.division)));
         });
-        this.loopBtn.addEventListener('click', () => this.toggleLoop());
+        this.addTouchEvent(this.loopBtn, () => this.toggleLoop());
 
         // Page buttons
         this.pageButtons.forEach(btn => {
-            btn.addEventListener('click', () => this.switchPage(parseInt(btn.dataset.page)));
+            this.addTouchEvent(btn, () => this.switchPage(parseInt(btn.dataset.page)));
         });
 
         // Keyboard scroll
         this.scrollBar.addEventListener('mousedown', (e) => this.onScrollBarStart(e));
-        this.scrollBar.addEventListener('touchstart', (e) => this.onScrollBarStart(e));
+        this.scrollBar.addEventListener('touchstart', (e) => this.onScrollBarStart(e), { passive: false });
         document.addEventListener('mousemove', (e) => this.onScrollBarMove(e));
-        document.addEventListener('touchmove', (e) => this.onScrollBarMove(e));
+        document.addEventListener('touchmove', (e) => this.onScrollBarMove(e), { passive: true });
         document.addEventListener('mouseup', () => this.onScrollBarEnd());
         document.addEventListener('touchend', () => this.onScrollBarEnd());
 
         // Mixer
         this.trackMixers.forEach((mixer, index) => {
-            mixer.addEventListener('touchstart', (e) => this.onMixerTouchStart(index, e));
-            mixer.addEventListener('touchmove', (e) => this.onMixerTouchMove(index, e));
+            mixer.addEventListener('touchstart', (e) => this.onMixerTouchStart(index, e), { passive: false });
+            mixer.addEventListener('touchmove', (e) => this.onMixerTouchMove(index, e), { passive: true });
             mixer.addEventListener('touchend', (e) => this.onMixerTouchEnd(index, e));
             mixer.addEventListener('mousedown', (e) => this.onMixerMouseDown(index, e));
         });
 
-        // Init audio
-        document.addEventListener('touchstart', () => this.initAudio(), { once: true });
-        document.addEventListener('click', () => this.initAudio(), { once: true });
+        // Init audio on ANY touch - iOS requires this
+        const initAudioHandler = async () => {
+            await this.initAudio();
+            // Remove after first call
+            document.removeEventListener('touchstart', initAudioHandler);
+            document.removeEventListener('touchend', initAudioHandler);
+            document.removeEventListener('click', initAudioHandler);
+        };
+
+        document.addEventListener('touchstart', initAudioHandler, { passive: true });
+        document.addEventListener('touchend', initAudioHandler, { passive: true });
+        document.addEventListener('click', initAudioHandler);
+    }
+
+    // Helper for iOS-friendly touch events
+    addTouchEvent(element, handler) {
+        let touchHandled = false;
+
+        element.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchHandled = true;
+            handler();
+            // Reset after a short delay
+            setTimeout(() => { touchHandled = false; }, 300);
+        }, { passive: false });
+
+        element.addEventListener('click', (e) => {
+            // Only handle if not already handled by touch
+            if (!touchHandled) {
+                handler();
+            }
+        });
     }
 
     async initAudio() {
@@ -228,7 +242,6 @@ class PocketMusica {
                 { pattern: this.createEmptyPattern(), soundType: 'noise', volume: 100, muted: false, division: 16, length: 16, loop: true }
             ];
             this.bpm = 120;
-            this.currentStep = 0;
             this.selectedStep = 0;
             this.currentTrack = 0;
             this.currentPage = 0;
@@ -245,7 +258,7 @@ class PocketMusica {
 
         if (fileName) {
             const data = {
-                version: 6,
+                version: 7,
                 bpm: this.bpm,
                 tracks: this.tracks,
                 savedAt: new Date().toISOString()
@@ -273,7 +286,6 @@ class PocketMusica {
                 const data = JSON.parse(e.target.result);
                 this.bpm = data.bpm || 120;
                 this.tracks = data.tracks || this.tracks;
-                this.currentStep = 0;
                 this.selectedStep = 0;
 
                 this.updateDisplay();
@@ -290,7 +302,6 @@ class PocketMusica {
     // ==================== Track Tabs ====================
 
     onTrackTabDown(index, e) {
-        e.preventDefault();
         this.longPressTrack = index;
         this.longPressTimer = setTimeout(() => {
             this.showSoundSelector(index);
@@ -366,7 +377,6 @@ class PocketMusica {
             const page = parseInt(btn.dataset.page);
             btn.classList.toggle('active', page === this.currentPage);
 
-            // Disable page 2 if length <= 32
             if (page === 1) {
                 btn.classList.toggle('disabled', track.length <= 32);
             }
@@ -387,20 +397,16 @@ class PocketMusica {
     renderKeyboard() {
         this.keyboard.innerHTML = '';
 
-        const keyWidth = 51; // 48px + 3px gap
+        const keyWidth = 51;
         const totalKeys = this.keyboardOctaves * 7;
         const totalWidth = totalKeys * keyWidth;
 
-        // Wait for wrapper to be rendered
         setTimeout(() => {
             const viewWidth = this.keyboardWrapper?.offsetWidth || 340;
             this.maxKeyboardOffset = Math.max(0, totalWidth - viewWidth);
-
-            // Set scroll to start at C2 (left edge)
             this.setKeyboardScroll(0);
         }, 100);
 
-        // White keys
         for (let oct = this.keyboardStartOctave; oct < this.keyboardStartOctave + this.keyboardOctaves; oct++) {
             const octaveIndex = oct - this.keyboardStartOctave;
 
@@ -417,7 +423,6 @@ class PocketMusica {
             });
         }
 
-        // Black keys
         for (let oct = this.keyboardStartOctave; oct < this.keyboardStartOctave + this.keyboardOctaves; oct++) {
             const octaveIndex = oct - this.keyboardStartOctave;
             const blackKeyOffsets = [0.7, 1.7, 3.7, 4.7, 5.7];
@@ -442,11 +447,10 @@ class PocketMusica {
     }
 
     addKeyEvents(key) {
-        const startNote = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+        const startNote = async () => {
+            await audioEngine.init();
+            await audioEngine.resume();
 
-            audioEngine.resume();
             const fullNote = key.dataset.fullNote;
             const soundType = this.tracks[this.currentTrack].soundType;
             audioEngine.startNote(fullNote, soundType, this.currentTrack);
@@ -457,15 +461,14 @@ class PocketMusica {
             }
         };
 
-        const stopNote = (e) => {
-            e.preventDefault();
+        const stopNote = () => {
             const fullNote = key.dataset.fullNote;
             audioEngine.stopNote(fullNote, this.currentTrack);
             key.classList.remove('active');
         };
 
         key.addEventListener('mousedown', startNote);
-        key.addEventListener('touchstart', startNote);
+        key.addEventListener('touchstart', (e) => { e.preventDefault(); startNote(); }, { passive: false });
         key.addEventListener('mouseup', stopNote);
         key.addEventListener('touchend', stopNote);
         key.addEventListener('mouseleave', stopNote);
@@ -553,7 +556,6 @@ class PocketMusica {
             track.pattern[this.selectedStep] = { note: null, type: 'empty' };
         }
 
-        // Update page if needed
         this.currentPage = Math.floor(this.selectedStep / 32);
         this.updatePageButtons();
         this.renderGrid();
@@ -586,8 +588,6 @@ class PocketMusica {
     advanceStep() {
         const track = this.tracks[this.currentTrack];
         this.selectedStep = (this.selectedStep + 1) % track.length;
-
-        // Update page if needed
         this.currentPage = Math.floor(this.selectedStep / 32);
         this.updatePageButtons();
     }
@@ -604,7 +604,6 @@ class PocketMusica {
         const track = this.tracks[this.currentTrack];
         const pattern = track.pattern;
 
-        // Display 32 steps based on current page
         const startStep = this.currentPage * 32;
         const endStep = startStep + 32;
 
@@ -669,11 +668,11 @@ class PocketMusica {
 
     // ==================== Playback ====================
 
-    togglePlay() {
+    async togglePlay() {
         if (this.isPlaying) {
             this.stop();
         } else {
-            this.play();
+            await this.play();
         }
     }
 
@@ -730,7 +729,6 @@ class PocketMusica {
                 }
             }
 
-            // Update page if playing cursor leaves current page view
             const playingPos = this.trackPositions[this.currentTrack];
             const newPage = Math.floor(playingPos / 32);
             if (newPage !== this.currentPage && newPage < 2) {
@@ -902,7 +900,7 @@ class PocketMusica {
 
     autoSave() {
         const data = {
-            version: 6,
+            version: 7,
             bpm: this.bpm,
             tracks: this.tracks,
             savedAt: new Date().toISOString()

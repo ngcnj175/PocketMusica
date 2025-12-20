@@ -1,6 +1,6 @@
 /* ================================
-   Pocket Musica - Style v6
-   32-step fixed grid with page switching
+   Pocket Musica - Style v7
+   iOS touch optimized
    ================================ */
 
 :root {
@@ -265,7 +265,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
     gap: 6px;
     flex-shrink: 0;
 }
@@ -282,7 +282,6 @@ body {
     margin-right: 2px;
 }
 
-/* Larger control buttons */
 .ctrl-btn {
     padding: 6px 10px;
     background: var(--bg-tertiary);
@@ -321,30 +320,30 @@ body {
     background: rgba(0, 240, 255, 0.1);
 }
 
-/* Page controls */
+/* Page controls - more space above */
 .page-controls {
     display: flex;
     gap: 4px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     flex-shrink: 0;
 }
 
 .page-btn {
     flex: 1;
-    padding: 4px 8px;
+    padding: 5px 10px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
     cursor: pointer;
 }
 
 .page-btn.active {
-    border-color: var(--accent-magenta);
-    color: var(--accent-magenta);
-    background: rgba(255, 0, 170, 0.1);
+    border-color: var(--text-primary);
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .page-btn.disabled {
@@ -436,7 +435,7 @@ body {
 }
 
 /* ================================
-   Sequencer Controls
+   Sequencer Controls - iOS optimized
    ================================ */
 .seq-controls {
     display: flex;
@@ -457,6 +456,10 @@ body {
     border-radius: 6px;
     color: var(--text-secondary);
     cursor: pointer;
+    /* iOS touch optimization */
+    -webkit-appearance: none;
+    appearance: none;
+    touch-action: manipulation;
 }
 
 .seq-btn:active {
@@ -474,18 +477,13 @@ body {
     font-family: var(--font-display);
 }
 
-/* Play button - dim by default */
+/* Play button - same color as other buttons when inactive */
 .play-btn {
-    opacity: 0.5;
-}
-
-.play-btn:active {
-    opacity: 1;
+    /* Same as other seq-btn by default */
 }
 
 /* Play button blinking when playing */
 .play-btn.playing {
-    opacity: 1;
     border-color: var(--accent-green);
     color: var(--accent-green);
     animation: play-blink 0.5s ease-in-out infinite;
@@ -523,7 +521,7 @@ body {
 }
 
 /* ================================
-   Keyboard Section - Larger keys
+   Keyboard Section
    ================================ */
 .keyboard-section {
     background: var(--bg-secondary);
@@ -533,7 +531,6 @@ body {
     flex-shrink: 0;
 }
 
-/* Scroll Bar */
 .keyboard-scroll-bar {
     height: 18px;
     background: var(--bg-tertiary);
@@ -563,7 +560,6 @@ body {
     touch-action: none;
 }
 
-/* Larger keyboard - 1 octave visible */
 .keyboard {
     display: flex;
     position: relative;
@@ -591,6 +587,8 @@ body {
     position: relative;
     z-index: 1;
     touch-action: manipulation;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .key.black {
