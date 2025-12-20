@@ -1,6 +1,6 @@
 /**
- * Pocket Musica - Main Application v4
- * Multi-track chiptune sequencer
+ * Pocket Musica - Main Application v5
+ * 64-step fixed grid, per-track DIV timing
  */
 
 class PocketMusica {
@@ -33,7 +33,8 @@ class PocketMusica {
         // Keyboard settings - 4 octaves (C2 to B5)
         this.keyboardStartOctave = 2;
         this.keyboardOctaves = 4;
-        this.noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        this.keyboardOffset = 0; // Scroll position
+        this.maxKeyboardOffset = 0;
 
         // Long press handling
         this.longPressTimer = null;
@@ -48,8 +49,13 @@ class PocketMusica {
         this.mixerTouchStart = {};
         this.mixerDoubleTapTime = {};
 
-        // Track positions for non-looping tracks
+        // Track positions for playback (per-track timing)
+        this.trackCounters = [0, 0, 0, 0]; // Sub-step counters
         this.trackPositions = [0, 0, 0, 0];
+
+        // Scroll bar handling
+        this.scrollBarDragging = false;
+        this.scrollBarStartX = 0;
 
         this.init();
     }
@@ -61,15 +67,12 @@ class PocketMusica {
         this.renderGrid();
         this.loadFromStorage();
         this.updateDisplay();
-
-        // Prevent text selection on buttons
         this.preventTextSelection();
 
-        console.log('🎹 Pocket Musica v4 initialized');
+        console.log('🎹 Pocket Musica v5 initialized');
     }
 
     preventTextSelection() {
-        // Prevent default on all buttons
         document.querySelectorAll('button').forEach(btn => {
             btn.addEventListener('selectstart', (e) => e.preventDefault());
             btn.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -93,28 +96,29 @@ class PocketMusica {
         // Keyboard
         this.keyboardWrapper = document.getElementById('keyboard-wrapper');
         this.keyboard = document.getElementById('keyboard');
+        this.scrollBar = document.getElementById('keyboard-scroll-bar');
+        this.scrollIndicator = document.getElementById('scroll-indicator');
 
         // Seq controls
         this.delBtn = document.getElementById('btn-del');
         this.restBtn = document.getElementById('btn-rest');
         this.tieBtn = document.getElementById('btn-tie');
         this.recBtn = document.getElementById('btn-rec');
+        this.playStopBtn = document.getElementById('btn-play-stop');
 
         // Grid
-        this.stepGridWrapper = document.getElementById('step-grid-wrapper');
         this.stepGrid = document.getElementById('step-grid');
         this.lenButtons = document.querySelectorAll('.len-btn');
         this.divButtons = document.querySelectorAll('.div-btn');
         this.loopBtn = document.getElementById('btn-loop');
 
-        // Player
-        this.playStopBtn = document.getElementById('btn-play-stop');
+        // Mixer
         this.mixer = document.getElementById('mixer');
         this.trackMixers = document.querySelectorAll('.track-mixer');
     }
 
     bindEvents() {
-        // Tempo (±1)
+        // Tempo
         this.tempoDownBtn.addEventListener('click', () => this.changeTempo(-1));
         this.tempoUpBtn.addEventListener('click', () => this.changeTempo(1));
 
@@ -134,12 +138,11 @@ class PocketMusica {
             tab.addEventListener('touchcancel', () => this.cancelLongPress());
         });
 
-        // Sound selector options
+        // Sound selector
         this.soundSelector.querySelectorAll('.sound-option').forEach(btn => {
             btn.addEventListener('click', () => this.selectSound(btn.dataset.sound));
         });
 
-        // Close sound selector on outside click
         document.addEventListener('click', (e) => {
             if (!this.soundSelector.contains(e.target) && !e.target.closest('.track-tab')) {
                 this.soundSelector.classList.remove('visible');
@@ -150,9 +153,10 @@ class PocketMusica {
         this.restBtn.addEventListener('click', () => this.insertRest());
         this.tieBtn.addEventListener('click', () => this.insertTie());
         this.recBtn.addEventListener('click', () => this.toggleRecording());
+        this.playStopBtn.addEventListener('click', () => this.togglePlay());
 
-        // DEL - short press: delete previous, long press: clear track
-        this.delBtn.addEventListener('click', () => this.deletePrevious());
+        // DEL button
+        this.delBtn.addEventListener('click', () => this.handleDelete());
         this.delBtn.addEventListener('mousedown', () => this.startDelLongPress());
         this.delBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.startDelLongPress(); });
         this.delBtn.addEventListener('mouseup', () => this.cancelDelLongPress());
@@ -160,21 +164,22 @@ class PocketMusica {
         this.delBtn.addEventListener('mouseleave', () => this.cancelDelLongPress());
         this.delBtn.addEventListener('touchcancel', () => this.cancelDelLongPress());
 
-        // Length buttons
+        // Length/Division/Loop buttons
         this.lenButtons.forEach(btn => {
             btn.addEventListener('click', () => this.changeLength(parseInt(btn.dataset.length)));
         });
-
-        // Division buttons
         this.divButtons.forEach(btn => {
             btn.addEventListener('click', () => this.changeDivision(parseInt(btn.dataset.division)));
         });
-
-        // Loop button
         this.loopBtn.addEventListener('click', () => this.toggleLoop());
 
-        // Play/Stop
-        this.playStopBtn.addEventListener('click', () => this.togglePlay());
+        // Keyboard scroll bar
+        this.scrollBar.addEventListener('mousedown', (e) => this.onScrollBarStart(e));
+        this.scrollBar.addEventListener('touchstart', (e) => this.onScrollBarStart(e));
+        document.addEventListener('mousemove', (e) => this.onScrollBarMove(e));
+        document.addEventListener('touchmove', (e) => this.onScrollBarMove(e));
+        document.addEventListener('mouseup', () => this.onScrollBarEnd());
+        document.addEventListener('touchend', () => this.onScrollBarEnd());
 
         // Mixer
         this.trackMixers.forEach((mixer, index) => {
@@ -184,7 +189,7 @@ class PocketMusica {
             mixer.addEventListener('mousedown', (e) => this.onMixerMouseDown(index, e));
         });
 
-        // Init audio on first interaction
+        // Init audio
         document.addEventListener('touchstart', () => this.initAudio(), { once: true });
         document.addEventListener('click', () => this.initAudio(), { once: true });
     }
@@ -215,6 +220,7 @@ class PocketMusica {
             this.selectedStep = 0;
             this.currentTrack = 0;
             this.trackPositions = [0, 0, 0, 0];
+            this.trackCounters = [0, 0, 0, 0];
 
             this.updateDisplay();
             this.renderGrid();
@@ -228,7 +234,7 @@ class PocketMusica {
 
         if (fileName) {
             const data = {
-                version: 4,
+                version: 5,
                 bpm: this.bpm,
                 tracks: this.tracks,
                 savedAt: new Date().toISOString()
@@ -260,12 +266,13 @@ class PocketMusica {
                 this.currentStep = 0;
                 this.selectedStep = 0;
                 this.trackPositions = [0, 0, 0, 0];
+                this.trackCounters = [0, 0, 0, 0];
 
                 this.updateDisplay();
                 this.renderGrid();
                 this.showToast('📂 ロードしました');
             } catch (err) {
-                this.showToast('❌ ファイルの読み込みに失敗しました');
+                this.showToast('❌ 読み込み失敗');
             }
         };
         reader.readAsText(file);
@@ -316,7 +323,7 @@ class PocketMusica {
 
     switchTrack(index) {
         this.currentTrack = index;
-        this.selectedStep = 0;
+        this.selectedStep = Math.min(this.selectedStep, this.tracks[index].length - 1);
         this.updateTrackTabs();
         this.updateControlButtons();
         this.renderGrid();
@@ -332,17 +339,14 @@ class PocketMusica {
     updateControlButtons() {
         const track = this.tracks[this.currentTrack];
 
-        // Update LEN buttons
         this.lenButtons.forEach(btn => {
             btn.classList.toggle('active', parseInt(btn.dataset.length) === track.length);
         });
 
-        // Update DIV buttons
         this.divButtons.forEach(btn => {
             btn.classList.toggle('active', parseInt(btn.dataset.division) === track.division);
         });
 
-        // Update LOOP button
         this.loopBtn.classList.toggle('active', track.loop);
     }
 
@@ -351,12 +355,17 @@ class PocketMusica {
     renderKeyboard() {
         this.keyboard.innerHTML = '';
 
-        // Generate 4 octaves of keys
+        const totalKeys = this.keyboardOctaves * 7;
+        const keyWidth = 36; // Match CSS
+        const totalWidth = totalKeys * keyWidth;
+        const viewWidth = this.keyboardWrapper?.offsetWidth || 300;
+        this.maxKeyboardOffset = Math.max(0, totalWidth - viewWidth);
+
+        // Generate white keys
         for (let oct = this.keyboardStartOctave; oct < this.keyboardStartOctave + this.keyboardOctaves; oct++) {
             const octaveIndex = oct - this.keyboardStartOctave;
 
-            // White keys for this octave
-            ['C', 'D', 'E', 'F', 'G', 'A', 'B'].forEach((note, noteIndex) => {
+            ['C', 'D', 'E', 'F', 'G', 'A', 'B'].forEach((note) => {
                 const key = document.createElement('button');
                 key.className = 'key';
                 key.textContent = `${note}${octaveIndex}`;
@@ -369,7 +378,7 @@ class PocketMusica {
             });
         }
 
-        // Black keys
+        // Generate black keys
         for (let oct = this.keyboardStartOctave; oct < this.keyboardStartOctave + this.keyboardOctaves; oct++) {
             const octaveIndex = oct - this.keyboardStartOctave;
             const blackKeyOffsets = [0.7, 1.7, 3.7, 4.7, 5.7];
@@ -383,8 +392,8 @@ class PocketMusica {
                 key.dataset.octave = oct;
                 key.dataset.fullNote = `${note}${oct}`;
 
-                const baseOffset = octaveIndex * 7 * 38;
-                const keyOffset = blackKeyOffsets[i] * 38;
+                const baseOffset = octaveIndex * 7 * 36;
+                const keyOffset = blackKeyOffsets[i] * 36;
                 key.style.left = `${baseOffset + keyOffset}px`;
 
                 this.addKeyEvents(key);
@@ -392,11 +401,8 @@ class PocketMusica {
             });
         }
 
-        // Scroll to middle
-        setTimeout(() => {
-            const scrollTo = 2 * 7 * 38;
-            this.keyboardWrapper.scrollLeft = scrollTo;
-        }, 100);
+        // Set initial scroll position
+        this.setKeyboardScroll(this.maxKeyboardOffset * 0.375);
     }
 
     addKeyEvents(key) {
@@ -430,6 +436,47 @@ class PocketMusica {
         key.addEventListener('touchcancel', stopNote);
     }
 
+    // Scroll bar controls
+    onScrollBarStart(e) {
+        e.preventDefault();
+        this.scrollBarDragging = true;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        this.scrollBarStartX = clientX;
+        this.scrollBarStartOffset = this.keyboardOffset;
+    }
+
+    onScrollBarMove(e) {
+        if (!this.scrollBarDragging) return;
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const barWidth = this.scrollBar.offsetWidth;
+        const indicatorWidth = this.scrollIndicator.offsetWidth;
+        const deltaX = clientX - this.scrollBarStartX;
+
+        // Map scroll bar movement to keyboard offset
+        const scrollableWidth = barWidth - indicatorWidth;
+        const ratio = this.maxKeyboardOffset / scrollableWidth;
+
+        const newOffset = this.scrollBarStartOffset + (deltaX * ratio);
+        this.setKeyboardScroll(newOffset);
+    }
+
+    onScrollBarEnd() {
+        this.scrollBarDragging = false;
+    }
+
+    setKeyboardScroll(offset) {
+        this.keyboardOffset = Math.max(0, Math.min(this.maxKeyboardOffset, offset));
+        this.keyboard.style.transform = `translateX(-${this.keyboardOffset}px)`;
+
+        // Update indicator position
+        const barWidth = this.scrollBar.offsetWidth;
+        const indicatorWidth = this.scrollIndicator.offsetWidth;
+        const scrollableWidth = barWidth - indicatorWidth;
+        const indicatorPos = (this.keyboardOffset / this.maxKeyboardOffset) * scrollableWidth || 0;
+        this.scrollIndicator.style.left = `${indicatorPos}px`;
+    }
+
     // ==================== Pattern Input ====================
 
     insertNote(note) {
@@ -456,16 +503,23 @@ class PocketMusica {
         this.autoSave();
     }
 
-    deletePrevious() {
+    handleDelete() {
         const track = this.tracks[this.currentTrack];
+        const step = track.pattern[this.selectedStep];
 
-        if (this.selectedStep > 0) {
-            this.selectedStep--;
+        // If current step has content, clear it
+        if (step.type !== 'empty') {
+            track.pattern[this.selectedStep] = { note: null, type: 'empty' };
         } else {
-            this.selectedStep = track.length - 1;
+            // Otherwise, go back one step and clear
+            if (this.selectedStep > 0) {
+                this.selectedStep--;
+            } else {
+                this.selectedStep = track.length - 1;
+            }
+            track.pattern[this.selectedStep] = { note: null, type: 'empty' };
         }
 
-        track.pattern[this.selectedStep] = { note: null, type: 'empty' };
         this.renderGrid();
         this.autoSave();
     }
@@ -508,7 +562,7 @@ class PocketMusica {
         const track = this.tracks[this.currentTrack];
         const pattern = track.pattern;
 
-        // Always show 64 steps (8 rows)
+        // Always show 64 steps
         for (let i = 0; i < 64; i++) {
             const step = pattern[i];
             const stepEl = document.createElement('div');
@@ -519,7 +573,7 @@ class PocketMusica {
             if (step.type === 'tie') stepEl.classList.add('tie');
             if (i >= track.length) stepEl.classList.add('out-of-range');
             if (i === this.trackPositions[this.currentTrack] && this.isPlaying) stepEl.classList.add('current');
-            if (i === this.selectedStep) stepEl.classList.add('selected');
+            if (i === this.selectedStep && i < track.length) stepEl.classList.add('selected');
 
             const numEl = document.createElement('span');
             numEl.className = 'step-number';
@@ -585,60 +639,72 @@ class PocketMusica {
         this.isPlaying = true;
         this.playStopBtn.classList.add('playing');
         this.playStopBtn.querySelector('.play-icon').textContent = '■';
+        this.playStopBtn.querySelector('.seq-label').textContent = 'STOP';
 
-        // Reset track positions
+        // Reset positions
         this.trackPositions = [0, 0, 0, 0];
+        this.trackCounters = [0, 0, 0, 0];
 
-        // Use smallest division for timing
-        const minDivision = Math.max(...this.tracks.map(t => t.division));
-        const stepDuration = 60 / this.bpm / (minDivision / 4);
+        // Base timing - use 32nd notes as the smallest unit
+        const baseStepDuration = 60 / this.bpm / 8; // 32nd note duration
 
         this.playInterval = setInterval(() => {
-            // Play all tracks
+            // Process each track independently based on its division
             for (let t = 0; t < 4; t++) {
                 const track = this.tracks[t];
                 const pos = this.trackPositions[t];
 
-                if (pos < track.length || track.loop) {
-                    const actualPos = pos % track.length;
-                    const step = track.pattern[actualPos];
+                // Check if this track should play on this tick
+                // division 8 = every 4 ticks, 16 = every 2 ticks, 32 = every tick
+                const ticksPerStep = 32 / track.division;
+                this.trackCounters[t]++;
 
-                    // Calculate note duration based on TIEs
-                    let noteDuration = stepDuration * (minDivision / track.division);
-                    if (step.type === 'note') {
-                        let tieCount = 0;
-                        for (let i = actualPos + 1; i < track.length; i++) {
-                            if (track.pattern[i].type === 'tie') {
-                                tieCount++;
-                            } else {
-                                break;
+                if (this.trackCounters[t] >= ticksPerStep) {
+                    this.trackCounters[t] = 0;
+
+                    if (pos < track.length || track.loop) {
+                        const actualPos = pos % track.length;
+                        const step = track.pattern[actualPos];
+
+                        // Calculate note duration with TIE
+                        let noteDuration = baseStepDuration * ticksPerStep;
+                        if (step.type === 'note') {
+                            let tieCount = 0;
+                            for (let i = actualPos + 1; i < track.length; i++) {
+                                if (track.pattern[i].type === 'tie') {
+                                    tieCount++;
+                                } else {
+                                    break;
+                                }
                             }
+                            noteDuration *= (1 + tieCount);
                         }
-                        noteDuration *= (1 + tieCount);
-                    }
 
-                    if (step.type !== 'tie') {
-                        audioEngine.playStep(step, track.soundType, noteDuration, t);
-                    }
+                        if (step.type !== 'tie') {
+                            audioEngine.playStep(step, track.soundType, noteDuration, t);
+                        }
 
-                    // Advance position
-                    if (track.loop) {
-                        this.trackPositions[t] = (pos + 1) % track.length;
-                    } else {
-                        this.trackPositions[t] = pos + 1;
+                        // Advance position
+                        if (track.loop) {
+                            this.trackPositions[t] = (pos + 1) % track.length;
+                        } else {
+                            this.trackPositions[t] = pos + 1;
+                        }
                     }
                 }
             }
 
             this.renderGrid();
-        }, stepDuration * 1000);
+        }, baseStepDuration * 1000);
     }
 
     stop() {
         this.isPlaying = false;
         this.playStopBtn.classList.remove('playing');
         this.playStopBtn.querySelector('.play-icon').textContent = '▶';
+        this.playStopBtn.querySelector('.seq-label').textContent = 'PLAY';
         this.trackPositions = [0, 0, 0, 0];
+        this.trackCounters = [0, 0, 0, 0];
 
         if (this.playInterval) {
             clearInterval(this.playInterval);
@@ -684,10 +750,6 @@ class PocketMusica {
             btn.classList.toggle('active', parseInt(btn.dataset.division) === newDivision);
         });
 
-        if (this.isPlaying) {
-            this.stop();
-            this.play();
-        }
         this.autoSave();
     }
 
@@ -715,9 +777,8 @@ class PocketMusica {
 
         const touch = e.touches[0];
         const deltaY = this.mixerTouchStart[index].y - touch.clientY;
-        const deltaVolume = Math.round(deltaY / 1.5); // Sensitivity
+        const deltaVolume = Math.round(deltaY / 1.5);
 
-        // Volume range: 1-127
         const newVolume = Math.max(1, Math.min(127, this.mixerTouchStart[index].volume + deltaVolume));
         this.setTrackVolume(index, newVolume);
     }
@@ -728,7 +789,6 @@ class PocketMusica {
         const now = Date.now();
         const duration = now - this.mixerTouchStart[index].time;
 
-        // Double tap detection
         if (duration < 200) {
             if (this.mixerDoubleTapTime[index] && now - this.mixerDoubleTapTime[index] < 300) {
                 this.toggleMute(index);
@@ -795,7 +855,7 @@ class PocketMusica {
 
     autoSave() {
         const data = {
-            version: 4,
+            version: 5,
             bpm: this.bpm,
             tracks: this.tracks,
             savedAt: new Date().toISOString()
@@ -818,8 +878,7 @@ class PocketMusica {
             this.bpm = data.bpm || 120;
 
             if (data.tracks) {
-                // Migrate old format if needed
-                this.tracks = data.tracks.map((t, i) => ({
+                this.tracks = data.tracks.map((t) => ({
                     pattern: t.pattern || this.createEmptyPattern(),
                     soundType: t.soundType || 'pulse1',
                     volume: t.volume || 100,
@@ -840,15 +899,15 @@ class PocketMusica {
         const toast = document.createElement('div');
         toast.style.cssText = `
             position: fixed;
-            bottom: 80px;
+            bottom: 60px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0, 240, 255, 0.9);
             color: #000;
-            padding: 8px 16px;
-            border-radius: 16px;
+            padding: 6px 14px;
+            border-radius: 14px;
             font-family: var(--font-mono);
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             z-index: 1000;
             animation: fadeInOut 2s ease-in-out forwards;
         `;
