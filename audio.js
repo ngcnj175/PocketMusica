@@ -1,6 +1,6 @@
 /**
- * PocketMusica - Audio Engine v3
- * Multi-track chiptune synthesizer
+ * PocketMusica - Audio Engine v4
+ * Multi-track chiptune synthesizer with PAN
  * Optimized for iOS Safari
  */
 
@@ -9,10 +9,13 @@ class ChiptuneAudio {
         this.audioContext = null;
         this.masterGain = null;
         this.trackGains = [];
+        this.trackPanners = [];
         this.trackMuted = [false, false, false, false];
-        this.trackVolumes = [1, 1, 1, 1];
+        this.trackVolumes = [0.8, 0.8, 0.8, 0.8]; // Default 80%
+        this.trackPans = [0, 0, 0, 0]; // -100 to 100 (L100 to R100)
         this.isInitialized = false;
         this.activeOscillators = new Map();
+        this.lastInteractionTime = Date.now();
 
         this.soundTypes = {
             pulse1: { type: 'square', detune: 0 },
@@ -26,7 +29,6 @@ class ChiptuneAudio {
         if (this.isInitialized) return;
 
         try {
-            // iOS Safari requires webkitAudioContext
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             this.audioContext = new AudioContextClass();
 
@@ -35,23 +37,30 @@ class ChiptuneAudio {
             this.masterGain.gain.value = 0.3;
             this.masterGain.connect(this.audioContext.destination);
 
-            // Per-track gain nodes
+            // Per-track panner + gain nodes
             for (let i = 0; i < 4; i++) {
+                // Create stereo panner for pan control
+                const panner = this.audioContext.createStereoPanner();
+                panner.pan.value = 0;
+                panner.connect(this.masterGain);
+                this.trackPanners.push(panner);
+
+                // Per-track gain
                 const gain = this.audioContext.createGain();
-                gain.gain.value = 1;
-                gain.connect(this.masterGain);
+                gain.gain.value = 0.8; // Default 80%
+                gain.connect(panner);
                 this.trackGains.push(gain);
             }
 
             this.isInitialized = true;
-            console.log('🎵 Audio engine initialized');
+            console.log('🎵 Audio engine v4 initialized');
 
-            // iOS: Force resume immediately after user interaction
+            // iOS: Force resume
             if (this.audioContext.state === 'suspended') {
                 await this.audioContext.resume();
             }
 
-            // iOS: Play silent sound to unlock audio
+            // iOS: Play silent sound to unlock
             this.playSilent();
 
         } catch (error) {
@@ -59,14 +68,13 @@ class ChiptuneAudio {
         }
     }
 
-    // Play a silent sound to unlock iOS audio
     playSilent() {
         if (!this.audioContext) return;
 
         const oscillator = this.audioContext.createOscillator();
         const gainNode = this.audioContext.createGain();
 
-        gainNode.gain.value = 0.001; // Almost silent
+        gainNode.gain.value = 0.001;
         oscillator.connect(gainNode);
         gainNode.connect(this.audioContext.destination);
 
@@ -75,12 +83,37 @@ class ChiptuneAudio {
     }
 
     async resume() {
-        if (this.audioContext && this.audioContext.state === 'suspended') {
+        this.lastInteractionTime = Date.now();
+
+        if (!this.audioContext) {
+            await this.init();
+            return;
+        }
+
+        if (this.audioContext.state === 'suspended') {
             try {
                 await this.audioContext.resume();
+                this.playSilent();
             } catch (e) {
-                console.log('Resume failed, will retry on next interaction');
+                console.log('Resume failed, reinitializing...');
+                // Force reinitialize
+                this.isInitialized = false;
+                this.trackGains = [];
+                this.trackPanners = [];
+                await this.init();
             }
+        }
+    }
+
+    // Check and recover audio context if needed (call periodically)
+    async checkAndRecover() {
+        if (!this.audioContext) {
+            await this.init();
+            return;
+        }
+
+        if (this.audioContext.state === 'suspended' || this.audioContext.state === 'interrupted') {
+            await this.resume();
         }
     }
 
@@ -202,6 +235,15 @@ class ChiptuneAudio {
             if (!this.trackMuted[trackIndex]) {
                 this.trackGains[trackIndex].gain.value = volume;
             }
+        }
+    }
+
+    setTrackPan(trackIndex, pan) {
+        // pan: -100 (L100) to 100 (R100)
+        if (this.trackPanners[trackIndex]) {
+            this.trackPans[trackIndex] = pan;
+            // Convert -100~100 to -1~1
+            this.trackPanners[trackIndex].pan.value = pan / 100;
         }
     }
 

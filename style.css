@@ -651,14 +651,11 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    cursor: pointer;
+    align-items: stretch;
+    gap: 0;
     background: var(--bg-tertiary);
     border-radius: 4px;
-    padding: 6px 4px;
-    touch-action: none;
+    overflow: hidden;
 }
 
 .track-mixer:nth-child(1) {
@@ -677,6 +674,25 @@ body {
     --mixer-color: var(--track4-color);
 }
 
+.mixer-volume-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 4px;
+    cursor: ns-resize;
+    touch-action: none;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.mixer-pan-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    cursor: ew-resize;
+    touch-action: none;
+}
+
 .mixer-volume {
     font-family: var(--font-display);
     font-size: 0.85rem;
@@ -684,10 +700,12 @@ body {
     font-weight: bold;
 }
 
-.track-label {
+.mixer-pan {
     font-family: var(--font-display);
-    font-size: 0.55rem;
-    color: var(--text-muted);
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    min-width: 30px;
+    text-align: center;
 }
 
 .track-mixer.muted {
