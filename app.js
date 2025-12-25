@@ -1,6 +1,6 @@
 /**
- * Pocket Musica - Main Application v12
- * Long-press copy/paste, DIV sync, audio recovery, PAN
+ * Pocket Musica - Main Application v13
+ * DIV sync fix, no copy/paste
  */
 
 class PocketMusica {
@@ -44,19 +44,9 @@ class PocketMusica {
         this.lastTapTime = 0;
         this.lastTapStep = -1;
 
-        this.trackCounters = [0, 0, 0, 0];
         this.trackPositions = [0, 0, 0, 0];
 
         this.scrollBarDragging = false;
-
-        // Copy/Paste - long press to start selection
-        this.clipboard = [];
-        this.selectionStart = -1;
-        this.selectionEnd = -1;
-        this.isSelectMode = false;
-        this.selectLongPressTimer = null;
-        this.pasteLongPressTimer = null;
-        this.selectionTouchId = null;
 
         // Mixer touch state
         this.volumeTouchStart = {};
@@ -77,18 +67,16 @@ class PocketMusica {
         this.preventTextSelection();
         this.startAudioRecovery();
 
-        console.log('🎹 Pocket Musica v12 initialized');
+        console.log('🎹 Pocket Musica v13 initialized');
     }
 
     startAudioRecovery() {
-        // Check audio on visibility change
         document.addEventListener('visibilitychange', async () => {
             if (!document.hidden) {
                 await audioEngine.checkAndRecover();
             }
         });
 
-        // Periodic check when playing
         setInterval(async () => {
             if (this.isPlaying) {
                 await audioEngine.checkAndRecover();
@@ -196,16 +184,10 @@ class PocketMusica {
         document.addEventListener('mouseup', () => this.onScrollBarEnd());
         document.addEventListener('touchend', () => this.onScrollBarEnd());
 
-        // Grid touch events for copy/paste
-        this.stepGrid.addEventListener('touchstart', (e) => this.onGridTouchStart(e), { passive: false });
-        this.stepGrid.addEventListener('touchmove', (e) => this.onGridTouchMove(e), { passive: false });
-        this.stepGrid.addEventListener('touchend', (e) => this.onGridTouchEnd(e));
-        this.stepGrid.addEventListener('touchcancel', (e) => this.onGridTouchEnd(e));
-        this.stepGrid.addEventListener('mousedown', (e) => this.onGridMouseDown(e));
-        document.addEventListener('mousemove', (e) => this.onGridMouseMove(e));
-        document.addEventListener('mouseup', (e) => this.onGridMouseUp(e));
+        // Simple grid click/tap
+        this.stepGrid.addEventListener('click', (e) => this.onGridClick(e));
 
-        // Audio recovery on any interaction
+        // Audio recovery on interaction
         const recoverAudio = async () => {
             await audioEngine.resume();
         };
@@ -244,7 +226,6 @@ class PocketMusica {
     async initAudio() {
         await audioEngine.init();
 
-        // Apply saved volumes and pans
         this.tracks.forEach((track, index) => {
             audioEngine.setTrackVolume(index, track.volume / 100);
             audioEngine.setTrackPan(index, track.pan);
@@ -276,7 +257,6 @@ class PocketMusica {
             this.currentTrack = 0;
             this.currentPage = 0;
 
-            // Reset audio
             for (let i = 0; i < 4; i++) {
                 audioEngine.setTrackVolume(i, 0.8);
                 audioEngine.setTrackPan(i, 0);
@@ -294,7 +274,7 @@ class PocketMusica {
 
         if (fileName) {
             const data = {
-                version: 12,
+                version: 13,
                 bpm: this.bpm,
                 tracks: this.tracks,
                 savedAt: new Date().toISOString()
@@ -326,7 +306,6 @@ class PocketMusica {
                 this.tracks = data.tracks || this.tracks;
                 this.selectedStep = 0;
 
-                // Apply audio settings
                 this.tracks.forEach((track, index) => {
                     audioEngine.setTrackVolume(index, track.volume / 100);
                     audioEngine.setTrackPan(index, track.pan || 0);
@@ -501,7 +480,6 @@ class PocketMusica {
             const viewWidth = this.keyboardWrapper?.offsetWidth || 340;
             this.maxKeyboardOffset = Math.max(0, totalWidth - viewWidth);
 
-            // Start at C3
             const c3Offset = 2 * 7 * whiteKeyWidth;
             this.setKeyboardScroll(c3Offset);
         }, 50);
@@ -576,248 +554,27 @@ class PocketMusica {
         this.scrollIndicator.style.left = `${indicatorPos}px`;
     }
 
-    // ==================== Grid Copy/Paste ====================
+    // ==================== Grid ====================
 
-    getStepIndexFromPoint(x, y) {
-        const element = document.elementFromPoint(x, y);
-        if (!element) return -1;
+    onGridClick(e) {
+        const stepEl = e.target.closest('.step');
+        if (!stepEl) return;
 
-        const stepEl = element.closest('.step');
-        if (!stepEl) return -1;
-
-        const steps = Array.from(this.stepGrid.children);
-        const localIndex = steps.indexOf(stepEl);
-        if (localIndex === -1) return -1;
-
-        return this.currentPage * 32 + localIndex;
-    }
-
-    onGridTouchStart(e) {
-        if (e.touches.length !== 1) return;
-
-        const touch = e.touches[0];
-        const stepIndex = this.getStepIndexFromPoint(touch.clientX, touch.clientY);
-        if (stepIndex === -1) return;
+        const index = parseInt(stepEl.dataset.index);
+        if (isNaN(index)) return;
 
         const track = this.tracks[this.currentTrack];
-        if (stepIndex >= track.length) return;
+        if (index >= track.length) return;
 
-        e.preventDefault();
-        this.selectionTouchId = touch.identifier;
+        this.selectedStep = index;
 
-        // Check if clipboard has data for paste
-        if (this.clipboard.length > 0) {
-            // Start paste long press timer
-            this.pasteLongPressTimer = setTimeout(() => {
-                this.pasteAtStep(stepIndex);
-                this.isSelectMode = false;
-            }, 400);
-        }
-
-        // Start selection long press timer
-        this.selectLongPressTimer = setTimeout(() => {
-            // Cancel paste timer
-            if (this.pasteLongPressTimer) {
-                clearTimeout(this.pasteLongPressTimer);
-                this.pasteLongPressTimer = null;
-            }
-
-            this.isSelectMode = true;
-            this.selectionStart = stepIndex;
-            this.selectionEnd = stepIndex;
-            this.renderGrid();
-            this.showToast('📋 選択モード');
-        }, 400);
-    }
-
-    onGridTouchMove(e) {
-        const touch = Array.from(e.changedTouches).find(t => t.identifier === this.selectionTouchId);
-        if (!touch) return;
-
-        // Cancel paste timer on move
-        if (this.pasteLongPressTimer) {
-            clearTimeout(this.pasteLongPressTimer);
-            this.pasteLongPressTimer = null;
-        }
-
-        // Cancel selection timer if moved before long press triggered
-        if (!this.isSelectMode && this.selectLongPressTimer) {
-            clearTimeout(this.selectLongPressTimer);
-            this.selectLongPressTimer = null;
-            return;
-        }
-
-        if (!this.isSelectMode) return;
-
-        e.preventDefault();
-
-        const stepIndex = this.getStepIndexFromPoint(touch.clientX, touch.clientY);
-        if (stepIndex === -1) return;
-
-        const track = this.tracks[this.currentTrack];
-        if (stepIndex >= track.length) return;
-
-        if (stepIndex !== this.selectionEnd) {
-            this.selectionEnd = stepIndex;
-            this.renderGrid();
-        }
-    }
-
-    onGridTouchEnd(e) {
-        // Cancel all timers
-        if (this.selectLongPressTimer) {
-            clearTimeout(this.selectLongPressTimer);
-            this.selectLongPressTimer = null;
-        }
-        if (this.pasteLongPressTimer) {
-            clearTimeout(this.pasteLongPressTimer);
-            this.pasteLongPressTimer = null;
-        }
-
-        if (this.isSelectMode) {
-            // Copy the selected range
-            const start = Math.min(this.selectionStart, this.selectionEnd);
-            const end = Math.max(this.selectionStart, this.selectionEnd);
-            this.copyRange(start, end);
-            this.isSelectMode = false;
-        } else {
-            // Single tap - select step
-            const touch = e.changedTouches[0];
-            if (touch) {
-                const stepIndex = this.getStepIndexFromPoint(touch.clientX, touch.clientY);
-                if (stepIndex !== -1) {
-                    const track = this.tracks[this.currentTrack];
-                    if (stepIndex < track.length) {
-                        this.selectedStep = stepIndex;
-
-                        const step = track.pattern[stepIndex];
-                        if (step.type === 'note' && step.note) {
-                            audioEngine.resume();
-                            audioEngine.playNote(step.note, track.soundType, 0.2, this.currentTrack);
-                        }
-                    }
-                }
-            }
-        }
-
-        this.selectionStart = -1;
-        this.selectionEnd = -1;
-        this.selectionTouchId = null;
-        this.renderGrid();
-    }
-
-    onGridMouseDown(e) {
-        const stepIndex = this.getStepIndexFromPoint(e.clientX, e.clientY);
-        if (stepIndex === -1) return;
-
-        const track = this.tracks[this.currentTrack];
-        if (stepIndex >= track.length) return;
-
-        // Start selection long press timer
-        this.selectLongPressTimer = setTimeout(() => {
-            this.isSelectMode = true;
-            this.selectionStart = stepIndex;
-            this.selectionEnd = stepIndex;
-            this.renderGrid();
-            this.showToast('📋 選択モード');
-        }, 400);
-
-        // Start paste timer if clipboard has data
-        if (this.clipboard.length > 0) {
-            this.pasteLongPressTimer = setTimeout(() => {
-                this.pasteAtStep(stepIndex);
-            }, 400);
-        }
-    }
-
-    onGridMouseMove(e) {
-        if (!this.isSelectMode) {
-            // Cancel timers on move before selection mode
-            if (this.selectLongPressTimer) {
-                clearTimeout(this.selectLongPressTimer);
-                this.selectLongPressTimer = null;
-            }
-            if (this.pasteLongPressTimer) {
-                clearTimeout(this.pasteLongPressTimer);
-                this.pasteLongPressTimer = null;
-            }
-            return;
-        }
-
-        const stepIndex = this.getStepIndexFromPoint(e.clientX, e.clientY);
-        if (stepIndex === -1) return;
-
-        const track = this.tracks[this.currentTrack];
-        if (stepIndex >= track.length) return;
-
-        if (stepIndex !== this.selectionEnd) {
-            this.selectionEnd = stepIndex;
-            this.renderGrid();
-        }
-    }
-
-    onGridMouseUp(e) {
-        if (this.selectLongPressTimer) {
-            clearTimeout(this.selectLongPressTimer);
-            this.selectLongPressTimer = null;
-        }
-        if (this.pasteLongPressTimer) {
-            clearTimeout(this.pasteLongPressTimer);
-            this.pasteLongPressTimer = null;
-        }
-
-        if (this.isSelectMode) {
-            const start = Math.min(this.selectionStart, this.selectionEnd);
-            const end = Math.max(this.selectionStart, this.selectionEnd);
-            this.copyRange(start, end);
-            this.isSelectMode = false;
-        } else {
-            // Single click - select step
-            const stepIndex = this.getStepIndexFromPoint(e.clientX, e.clientY);
-            if (stepIndex !== -1) {
-                const track = this.tracks[this.currentTrack];
-                if (stepIndex < track.length) {
-                    this.selectedStep = stepIndex;
-
-                    const step = track.pattern[stepIndex];
-                    if (step.type === 'note' && step.note) {
-                        audioEngine.resume();
-                        audioEngine.playNote(step.note, track.soundType, 0.2, this.currentTrack);
-                    }
-                }
-            }
-        }
-
-        this.selectionStart = -1;
-        this.selectionEnd = -1;
-        this.renderGrid();
-    }
-
-    copyRange(start, end) {
-        const track = this.tracks[this.currentTrack];
-        this.clipboard = [];
-
-        for (let i = start; i <= end; i++) {
-            this.clipboard.push({ ...track.pattern[i] });
-        }
-
-        this.showToast(`📋 ${this.clipboard.length}ステップをコピー`);
-    }
-
-    pasteAtStep(startIndex) {
-        if (this.clipboard.length === 0) return;
-
-        const track = this.tracks[this.currentTrack];
-
-        for (let i = 0; i < this.clipboard.length; i++) {
-            const targetIndex = startIndex + i;
-            if (targetIndex >= track.length) break;
-            track.pattern[targetIndex] = { ...this.clipboard[i] };
+        const step = track.pattern[index];
+        if (step.type === 'note' && step.note) {
+            audioEngine.resume();
+            audioEngine.playNote(step.note, track.soundType, 0.2, this.currentTrack);
         }
 
         this.renderGrid();
-        this.autoSave();
-        this.showToast(`📋 ${this.clipboard.length}ステップを貼り付け`);
     }
 
     // ==================== Pattern Input ====================
@@ -902,8 +659,6 @@ class PocketMusica {
         this.recBtn.classList.toggle('active', this.isRecording);
     }
 
-    // ==================== Grid ====================
-
     renderGrid() {
         this.stepGrid.innerHTML = '';
         const track = this.tracks[this.currentTrack];
@@ -911,9 +666,6 @@ class PocketMusica {
 
         const startStep = this.currentPage * 32;
         const endStep = startStep + 32;
-
-        const selStart = Math.min(this.selectionStart, this.selectionEnd);
-        const selEnd = Math.max(this.selectionStart, this.selectionEnd);
 
         for (let i = startStep; i < endStep; i++) {
             const step = pattern[i];
@@ -927,10 +679,6 @@ class PocketMusica {
             if (i >= track.length) stepEl.classList.add('out-of-range');
             if (i === this.trackPositions[this.currentTrack] && this.isPlaying) stepEl.classList.add('current');
             if (i === this.selectedStep && i < track.length) stepEl.classList.add('selected');
-
-            if (this.isSelectMode && this.selectionStart !== -1 && i >= selStart && i <= selEnd && i < track.length) {
-                stepEl.classList.add('in-selection');
-            }
 
             const numEl = document.createElement('span');
             numEl.className = 'step-number';
@@ -952,7 +700,7 @@ class PocketMusica {
         }
     }
 
-    // ==================== Playback with DIV sync ====================
+    // ==================== Playback - Fixed DIV sync ====================
 
     async togglePlay() {
         if (this.isPlaying) {
@@ -969,14 +717,14 @@ class PocketMusica {
         this.isPlaying = true;
         this.playStopBtn.classList.add('playing');
 
-        // Reset all positions and counters
+        // Reset all positions
         this.trackPositions = [0, 0, 0, 0];
-        this.trackCounters = [0, 0, 0, 0];
 
-        // Global tick counter for sync
-        let globalTick = 0;
+        // Start with tick -1 so first increment makes it 0
+        // This ensures all tracks play their first step on tick 0
+        let globalTick = -1;
 
-        // Use 32nd note as the base tick
+        // Base tick = 32nd note duration
         const tickDuration = 60 / this.bpm / 8;
 
         this.playInterval = setInterval(() => {
@@ -985,11 +733,11 @@ class PocketMusica {
             for (let t = 0; t < 4; t++) {
                 const track = this.tracks[t];
 
-                // Calculate ticks per step based on division
-                // DIV 8 = every 4 ticks, DIV 16 = every 2 ticks, DIV 32 = every tick
+                // Ticks per step based on division
+                // DIV 8 = 4 ticks, DIV 16 = 2 ticks, DIV 32 = 1 tick
                 const ticksPerStep = 32 / track.division;
 
-                // Check if this tick is a step boundary for this track
+                // All tracks trigger on tick 0, then at their respective intervals
                 if (globalTick % ticksPerStep === 0) {
                     const pos = this.trackPositions[t];
 
@@ -997,6 +745,7 @@ class PocketMusica {
                         const actualPos = pos % track.length;
                         const step = track.pattern[actualPos];
 
+                        // Calculate note duration including ties
                         let noteDuration = tickDuration * ticksPerStep;
                         if (step.type === 'note') {
                             let tieCount = 0;
@@ -1010,10 +759,12 @@ class PocketMusica {
                             noteDuration *= (1 + tieCount);
                         }
 
+                        // Play step (not ties)
                         if (step.type !== 'tie') {
                             audioEngine.playStep(step, track.soundType, noteDuration, t);
                         }
 
+                        // Advance position
                         if (track.loop) {
                             this.trackPositions[t] = (pos + 1) % track.length;
                         } else {
@@ -1031,7 +782,6 @@ class PocketMusica {
         this.isPlaying = false;
         this.playStopBtn.classList.remove('playing');
         this.trackPositions = [0, 0, 0, 0];
-        this.trackCounters = [0, 0, 0, 0];
 
         if (this.playInterval) {
             clearInterval(this.playInterval);
@@ -1091,7 +841,7 @@ class PocketMusica {
         this.autoSave();
     }
 
-    // ==================== Mixer with separate Volume and PAN ====================
+    // ==================== Mixer ====================
 
     bindMixerEvents() {
         this.trackMixers.forEach((mixer, index) => {
@@ -1114,7 +864,6 @@ class PocketMusica {
         });
     }
 
-    // Volume controls
     onVolumeTouchStart(index, e) {
         e.preventDefault();
         const touch = e.touches[0];
@@ -1142,9 +891,7 @@ class PocketMusica {
         const moved = Math.abs(this.tracks[index].volume - this.volumeTouchStart[index].volume) > 3;
 
         if (!moved && duration < 200) {
-            // Check for double tap
             if (this.volumeDoubleTap[index] && now - this.volumeDoubleTap[index] < 300) {
-                // Reset to default (80)
                 this.setTrackVolume(index, 80);
                 this.volumeDoubleTap[index] = null;
             } else {
@@ -1176,7 +923,6 @@ class PocketMusica {
         document.addEventListener('mouseup', onMouseUp);
     }
 
-    // PAN controls
     onPanTouchStart(index, e) {
         e.preventDefault();
         const touch = e.touches[0];
@@ -1204,9 +950,7 @@ class PocketMusica {
         const moved = Math.abs(this.tracks[index].pan - this.panTouchStart[index].pan) > 5;
 
         if (!moved && duration < 200) {
-            // Check for double tap
             if (this.panDoubleTap[index] && now - this.panDoubleTap[index] < 300) {
-                // Reset to center (0)
                 this.setTrackPan(index, 0);
                 this.panDoubleTap[index] = null;
             } else {
@@ -1291,7 +1035,7 @@ class PocketMusica {
 
     autoSave() {
         const data = {
-            version: 12,
+            version: 13,
             bpm: this.bpm,
             tracks: this.tracks,
             savedAt: new Date().toISOString()
